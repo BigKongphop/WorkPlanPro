@@ -1,31 +1,29 @@
 import 'package:flutter/material.dart';
+import 'home_page.dart';
 
-class AccountScreen extends StatefulWidget {
+class AccountPage extends StatefulWidget {
   @override
-  _AccountScreenState createState() => _AccountScreenState();
+  _AccountPageState createState() => _AccountPageState();
 }
 
-class _AccountScreenState extends State<AccountScreen> {
-  int _currentIndex =
-      1; // Set this to 1 to highlight the Account tab by default
+class _AccountPageState extends State<AccountPage> {
+  int _currentIndex = 1;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Color(0xFF0C5217), // Dark Green
-        foregroundColor: Colors.white, // White icons and text
+        backgroundColor: Color(0xFF0C5217),
+        foregroundColor: Colors.white,
         title: Text('ACCOUNT'),
         centerTitle: false,
         leading: IconButton(
           icon: Icon(Icons.arrow_back),
-          onPressed: () {
-            // Handle back button press
-          },
+          onPressed: () {},
         ),
       ),
       body: Container(
-        color: Color(0xFFEFEFEF), // Light gray background
+        color: Color(0xFFEFEFEF),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -35,10 +33,10 @@ class _AccountScreenState extends State<AccountScreen> {
               children: [
                 CircleAvatar(
                   radius: 50,
-                  backgroundColor: Color(0xFF0C5217), // Dark green outer circle
+                  backgroundColor: Color(0xFF0C5217),
                   child: CircleAvatar(
                     radius: 48,
-                    backgroundColor: Colors.white, // White inner circle
+                    backgroundColor: Colors.white,
                     child: CircleAvatar(
                       radius: 45,
                       backgroundImage:
@@ -51,8 +49,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   right: 10,
                   child: CircleAvatar(
                     radius: 8,
-                    backgroundColor:
-                        Colors.greenAccent, // Green online indicator
+                    backgroundColor: Colors.greenAccent,
                   ),
                 ),
               ],
@@ -68,15 +65,13 @@ class _AccountScreenState extends State<AccountScreen> {
             AccountDetailRow(title: 'เบอร์โทรศัพท์', detail: '06-2589-6377'),
             SizedBox(height: 30),
             ElevatedButton(
-              onPressed: () {
-                // Handle logout
-              },
+              onPressed: () {},
               child: Text('ออกจากระบบ'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF5A5A5A), // Dark gray button
+                backgroundColor: Color(0xFF5A5A5A),
                 padding: EdgeInsets.symmetric(horizontal: 100, vertical: 15),
-                textStyle: TextStyle(fontSize: 18), // Font size set here
-                foregroundColor: Colors.white, // Set the text color to white
+                textStyle: TextStyle(fontSize: 18),
+                foregroundColor: Colors.white,
               ),
             ),
           ],
@@ -88,175 +83,62 @@ class _AccountScreenState extends State<AccountScreen> {
           setState(() {
             _currentIndex = index;
           });
+          if (index == 0) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => HomePage()),
+            );
+          }
         },
-        selectedItemColor: Colors.white, // สีของไอคอนและตัวอักษรเมื่อเลือก
-        unselectedItemColor:
-            Color(0xFF0C5217), // สีของไอคอนและตัวอักษรเมื่อไม่ได้เลือก
-        backgroundColor: Colors.white, // สีพื้นหลังของแถบ navigation
-        type: BottomNavigationBarType.fixed, // ให้มั่นใจว่าจะแสดงไอคอนทั้งหมด
+        selectedItemColor: Colors.white,
+        unselectedItemColor: Color(0xFF0C5217),
+        backgroundColor: Colors.white,
+        type: BottomNavigationBarType.fixed,
         items: [
           BottomNavigationBarItem(
-            icon: _currentIndex == 0
-                ? Container(
-                    width: double.infinity, // ใช้ให้เต็มความกว้างของ navBar
-                    padding: EdgeInsets.symmetric(
-                        vertical: 5), // ลด padding ด้านบนและล่าง
-                    decoration: BoxDecoration(
-                      color: Color(0xFF0C5217), // สีพื้นหลังเขียว
-                      borderRadius:
-                          BorderRadius.circular(0), // ลบความโค้งมนของมุม
-                    ),
-                    child: Column(
-                      mainAxisAlignment:
-                          MainAxisAlignment.center, // จัดกึ่งกลาง
-                      children: [
-                        Icon(Icons.home, color: Colors.white), // ไอคอนสีขาว
-                        Text(
-                          'Home',
-                          style: TextStyle(color: Colors.white), // ข้อความสีขาว
-                        )
-                      ],
-                    ),
-                  )
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center, // จัดกึ่งกลาง
-                    children: [
-                      Icon(Icons.home),
-                      Text('Home'),
-                    ],
-                  ),
-            label: '', // ทำให้ label ว่างเพราะเราจัดการเองใน icon
+            icon: _buildNavBarItem(Icons.home, 'Home', 0),
+            label: '',
           ),
           BottomNavigationBarItem(
-            icon: _currentIndex == 1
-                ? Container(
-                    width: double.infinity, // ใช้ให้เต็มความกว้างของ navBar
-                    padding: EdgeInsets.symmetric(
-                        vertical: 5), // ลด padding ด้านบนและล่าง
-                    decoration: BoxDecoration(
-                      color: Color(0xFF0C5217), // สีพื้นหลังเขียว
-                      borderRadius:
-                          BorderRadius.circular(0), // ลบความโค้งมนของมุม
-                    ),
-                    child: Column(
-                      mainAxisAlignment:
-                          MainAxisAlignment.center, // จัดกึ่งกลาง
-                      children: [
-                        Icon(Icons.person, color: Colors.white), // ไอคอนสีขาว
-                        Text(
-                          'Account',
-                          style: TextStyle(color: Colors.white), // ข้อความสีขาว
-                        )
-                      ],
-                    ),
-                  )
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center, // จัดกึ่งกลาง
-                    children: [
-                      Icon(Icons.person),
-                      Text('Account'),
-                    ],
-                  ),
-            label: '', // ทำให้ label ว่างเพราะเราจัดการเองใน icon
+            icon: _buildNavBarItem(Icons.person, 'Account', 1),
+            label: '',
           ),
           BottomNavigationBarItem(
-            icon: _currentIndex == 2
-                ? Container(
-                    width: double.infinity, // ใช้ให้เต็มความกว้างของ navBar
-                    padding: EdgeInsets.symmetric(
-                        vertical: 5), // ลด padding ด้านบนและล่าง
-                    decoration: BoxDecoration(
-                      color: Color(0xFF0C5217), // สีพื้นหลังเขียว
-                      borderRadius:
-                          BorderRadius.circular(0), // ลบความโค้งมนของมุม
-                    ),
-                    child: Column(
-                      mainAxisAlignment:
-                          MainAxisAlignment.center, // จัดกึ่งกลาง
-                      children: [
-                        Icon(Icons.notifications,
-                            color: Colors.white), // ไอคอนสีขาว
-                        Text(
-                          'Notification',
-                          style: TextStyle(color: Colors.white), // ข้อความสีขาว
-                        )
-                      ],
-                    ),
-                  )
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center, // จัดกึ่งกลาง
-                    children: [
-                      Icon(Icons.notifications),
-                      Text('Notification'),
-                    ],
-                  ),
-            label: '', // ทำให้ label ว่างเพราะเราจัดการเองใน icon
+            icon: _buildNavBarItem(Icons.notifications, 'Notification', 2),
+            label: '',
           ),
           BottomNavigationBarItem(
-            icon: _currentIndex == 3
-                ? Container(
-                    width: double.infinity, // ใช้ให้เต็มความกว้างของ navBar
-                    padding: EdgeInsets.symmetric(
-                        vertical: 5), // ลด padding ด้านบนและล่าง
-                    decoration: BoxDecoration(
-                      color: Color(0xFF0C5217), // สีพื้นหลังเขียว
-                      borderRadius:
-                          BorderRadius.circular(0), // ลบความโค้งมนของมุม
-                    ),
-                    child: Column(
-                      mainAxisAlignment:
-                          MainAxisAlignment.center, // จัดกึ่งกลาง
-                      children: [
-                        Icon(Icons.calendar_today,
-                            color: Colors.white), // ไอคอนสีขาว
-                        Text(
-                          'Calendar',
-                          style: TextStyle(color: Colors.white), // ข้อความสีขาว
-                        )
-                      ],
-                    ),
-                  )
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center, // จัดกึ่งกลาง
-                    children: [
-                      Icon(Icons.calendar_today),
-                      Text('Calendar'),
-                    ],
-                  ),
-            label: '', // ทำให้ label ว่างเพราะเราจัดการเองใน icon
+            icon: _buildNavBarItem(Icons.calendar_today, 'Calendar', 3),
+            label: '',
           ),
           BottomNavigationBarItem(
-            icon: _currentIndex == 4
-                ? Container(
-                    width: double.infinity, // ใช้ให้เต็มความกว้างของ navBar
-                    padding: EdgeInsets.symmetric(
-                        vertical: 5), // ลด padding ด้านบนและล่าง
-                    decoration: BoxDecoration(
-                      color: Color(0xFF0C5217), // สีพื้นหลังเขียว
-                      borderRadius:
-                          BorderRadius.circular(0), // ลบความโค้งมนของมุม
-                    ),
-                    child: Column(
-                      mainAxisAlignment:
-                          MainAxisAlignment.center, // จัดกึ่งกลาง
-                      children: [
-                        Icon(Icons.group, color: Colors.white), // ไอคอนสีขาว
-                        Text(
-                          'Group',
-                          style: TextStyle(color: Colors.white), // ข้อความสีขาว
-                        )
-                      ],
-                    ),
-                  )
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center, // จัดกึ่งกลาง
-                    children: [
-                      Icon(Icons.group),
-                      Text('Group'),
-                    ],
-                  ),
-            label: '', // ทำให้ label ว่างเพราะเราจัดการเองใน icon
+            icon: _buildNavBarItem(Icons.group, 'Group', 4),
+            label: '',
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavBarItem(IconData icon, String label, int index) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(vertical: 5),
+      decoration: BoxDecoration(
+        color: _currentIndex == index ? Color(0xFF0C5217) : Colors.transparent,
+        borderRadius: BorderRadius.circular(0),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon,
+              color: _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
+          Text(
+            label,
+            style: TextStyle(
+                color:
+                    _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
+          )
         ],
       ),
     );
@@ -290,13 +172,11 @@ class AccountDetailRow extends StatelessWidget {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
-              // Handle edit action
-            },
+            onPressed: () {},
             child: Text('แก้ไข'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF5A5A5A), // Dark gray edit button
-              foregroundColor: Colors.white, // Set the text color to white
+              backgroundColor: Color(0xFF5A5A5A),
+              foregroundColor: Colors.white,
             ),
           ),
         ],

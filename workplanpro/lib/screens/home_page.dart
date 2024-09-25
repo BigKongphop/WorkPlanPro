@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
 import 'create_note_screen.dart';
 import '../models/note.dart';
+import 'account_page.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
+  @override
+  _HomePageState createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  int _currentIndex = 0; // Set this to 0 to highlight the Home tab by default
+
   final List<Note> notes = [
     Note(date: '08 ม.ค.', title: 'หัวข้อ 1', content: 'เนื้อหา 1', rating: 0),
     Note(date: '09 ม.ค.', title: 'หัวข้อ 2', content: 'เนื้อหา 2', rating: 3),
@@ -114,9 +122,7 @@ class HomePage extends StatelessWidget {
           onPressed: () {
             Navigator.push(
               context,
-              MaterialPageRoute(
-                  builder: (context) =>
-                      CreateNoteScreen()),
+              MaterialPageRoute(builder: (context) => CreateNoteScreen()),
             );
           },
           style: ElevatedButton.styleFrom(
@@ -124,8 +130,7 @@ class HomePage extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(30),
             ),
-            padding: EdgeInsets.symmetric(
-                horizontal: 20, vertical: 10),
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           ),
           icon: Icon(Icons.add, color: Colors.white),
           label: Text(
@@ -138,19 +143,71 @@ class HomePage extends StatelessWidget {
           ),
         ),
       ),
-
       bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+          if (index == 1) {
+            // Navigate to AccountPage when Account tab is tapped
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => AccountPage()),
+            );
+          }
+          // Add navigation for other tabs as needed
+        },
+        selectedItemColor: Colors.white,
+        unselectedItemColor: Color(0xFF0C5217),
+        backgroundColor: Colors.white,
+        type: BottomNavigationBarType.fixed,
         items: [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Account'),
           BottomNavigationBarItem(
-              icon: Icon(Icons.notifications), label: 'Notification'),
+            icon: _buildNavBarItem(Icons.home, 'Home', 0),
+            label: '',
+          ),
           BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_today), label: 'Calendar'),
-          BottomNavigationBarItem(icon: Icon(Icons.group), label: 'Group'),
+            icon: _buildNavBarItem(Icons.person, 'Account', 1),
+            label: '',
+          ),
+          BottomNavigationBarItem(
+            icon: _buildNavBarItem(Icons.notifications, 'Notification', 2),
+            label: '',
+          ),
+          BottomNavigationBarItem(
+            icon: _buildNavBarItem(Icons.calendar_today, 'Calendar', 3),
+            label: '',
+          ),
+          BottomNavigationBarItem(
+            icon: _buildNavBarItem(Icons.group, 'Group', 4),
+            label: '',
+          ),
         ],
-        selectedItemColor: Color(0xFF0C5217),
-        unselectedItemColor: Colors.grey,
+      ),
+    );
+  }
+
+  Widget _buildNavBarItem(IconData icon, String label, int index) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(vertical: 5),
+      decoration: BoxDecoration(
+        color: _currentIndex == index ? Color(0xFF0C5217) : Colors.transparent,
+        borderRadius: BorderRadius.circular(0),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon,
+              color: _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
+          Text(
+            label,
+            style: TextStyle(
+                color:
+                    _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
+          )
+        ],
       ),
     );
   }
