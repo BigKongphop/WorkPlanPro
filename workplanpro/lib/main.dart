@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:workplanpro/screens/home_page.dart';
-import 'package:workplanpro/screens/account_page.dart';
+import 'package:workplanpro/screens/group_page.dart';
+import 'package:workplanpro/screens/calendar_page.dart';
 
 void main() {
   runApp(MyApp());
