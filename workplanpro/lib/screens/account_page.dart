@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'home_page.dart';
+import 'calendar_page.dart';
+import 'group_page.dart';
 
 class AccountPage extends StatefulWidget {
   @override
@@ -83,11 +85,28 @@ class _AccountPageState extends State<AccountPage> {
           setState(() {
             _currentIndex = index;
           });
-          if (index == 0) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => HomePage()),
-            );
+          switch (index) {
+            case 0:
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => HomePage()),
+              );
+              break;
+            case 1:
+              // Already on Account page
+              break;
+            case 3:
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => CalendarPage()),
+              );
+              break;
+            case 4:
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => GroupPage()),
+              );
+              break;
           }
         },
         selectedItemColor: Colors.white,

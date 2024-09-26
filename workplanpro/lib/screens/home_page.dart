@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'create_note_screen.dart';
 import '../models/note.dart';
 import 'account_page.dart';
+import 'calendar_page.dart';
+import 'group_page.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -9,7 +11,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _currentIndex = 0; // Set this to 0 to highlight the Home tab by default
+  int _currentIndex = 0;
 
   final List<Note> notes = [
     Note(date: '08 ม.ค.', title: 'หัวข้อ 1', content: 'เนื้อหา 1', rating: 0),
@@ -149,64 +151,28 @@ class _HomePageState extends State<HomePage> {
           setState(() {
             _currentIndex = index;
           });
-          if (index == 1) {
-            // Navigate to AccountPage when Account tab is tapped
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => AccountPage()),
-            );
+          switch (index) {
+            case 1:
+              Navigator.push(context, MaterialPageRoute(builder: (context) => AccountPage()));
+              break;
+            case 3:
+              Navigator.push(context, MaterialPageRoute(builder: (context) => CalendarPage()));
+              break;
+            case 4:
+              Navigator.push(context, MaterialPageRoute(builder: (context) => GroupPage()));
+              break;
           }
-          // Add navigation for other tabs as needed
         },
-        selectedItemColor: Colors.white,
-        unselectedItemColor: Color(0xFF0C5217),
+        selectedItemColor: Color(0xFF0C5217),
+        unselectedItemColor: Colors.grey,
         backgroundColor: Colors.white,
         type: BottomNavigationBarType.fixed,
         items: [
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.home, 'Home', 0),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.person, 'Account', 1),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.notifications, 'Notification', 2),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.calendar_today, 'Calendar', 3),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.group, 'Group', 4),
-            label: '',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavBarItem(IconData icon, String label, int index) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(vertical: 5),
-      decoration: BoxDecoration(
-        color: _currentIndex == index ? Color(0xFF0C5217) : Colors.transparent,
-        borderRadius: BorderRadius.circular(0),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon,
-              color: _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
-          Text(
-            label,
-            style: TextStyle(
-                color:
-                    _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
-          )
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Account'),
+          BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'Notification'),
+          BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Calendar'),
+          BottomNavigationBarItem(icon: Icon(Icons.group), label: 'Group'),
         ],
       ),
     );
