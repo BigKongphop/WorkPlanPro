@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'home_page.dart';
+import 'notification_page.dart';
 import 'calendar_page.dart';
 import 'group_page.dart';
 
@@ -87,25 +88,19 @@ class _AccountPageState extends State<AccountPage> {
           });
           switch (index) {
             case 0:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => HomePage()),
-              );
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
               break;
             case 1:
               // Already on Account page
               break;
+            case 2:
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => NotificationPage()));
+              break;
             case 3:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => CalendarPage()),
-              );
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => CalendarPage()));
               break;
             case 4:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => GroupPage()),
-              );
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => GroupPage()));
               break;
           }
         },

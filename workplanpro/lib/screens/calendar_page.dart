@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'home_page.dart';
 import 'account_page.dart';
 import 'group_page.dart';
+import 'notification_page.dart'; // Add this import
 
 class CalendarPage extends StatefulWidget {
   @override
@@ -63,16 +64,23 @@ class _CalendarPageState extends State<CalendarPage> {
           });
           switch (index) {
             case 0:
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
+              Navigator.pushReplacement(
+                  context, MaterialPageRoute(builder: (context) => HomePage()));
               break;
             case 1:
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => AccountPage()));
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (context) => AccountPage()));
+              break;
+            case 2:
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (context) => NotificationPage()));
               break;
             case 3:
               // Already on Calendar page
               break;
             case 4:
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => GroupPage()));
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (context) => GroupPage()));
               break;
           }
         },
@@ -145,7 +153,10 @@ class _CalendarPageState extends State<CalendarPage> {
             children: [
               Text(
                 DateFormat('MMMM yyyy').format(now),
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold),
               ),
               Icon(Icons.arrow_drop_down, color: Colors.white),
             ],
@@ -162,7 +173,9 @@ class _CalendarPageState extends State<CalendarPage> {
             itemBuilder: (context, index) {
               if (index < 7) {
                 final weekday = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'][index];
-                return Center(child: Text(weekday, style: TextStyle(color: Colors.white)));
+                return Center(
+                    child:
+                        Text(weekday, style: TextStyle(color: Colors.white)));
               }
               final day = index - 6;
               final date = DateTime(now.year, now.month, day);
@@ -171,14 +184,18 @@ class _CalendarPageState extends State<CalendarPage> {
               return Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isSelected ? Colors.white : (isToday ? Colors.white.withOpacity(0.3) : null),
+                  color: isSelected
+                      ? Colors.white
+                      : (isToday ? Colors.white.withOpacity(0.3) : null),
                 ),
                 child: Center(
                   child: Text(
                     '$day',
                     style: TextStyle(
                       color: isSelected ? Color(0xFF0C5217) : Colors.white,
-                      fontWeight: isToday || isSelected ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: isToday || isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                     ),
                   ),
                 ),
@@ -206,8 +223,7 @@ class _CalendarPageState extends State<CalendarPage> {
             color: Color(0xFF0C5217),
           ),
           onChanged: (String? newValue) {},
-          items: <String>[text]
-              .map<DropdownMenuItem<String>>((String value) {
+          items: <String>[text].map<DropdownMenuItem<String>>((String value) {
             return DropdownMenuItem<String>(
               value: value,
               child: Text(value),

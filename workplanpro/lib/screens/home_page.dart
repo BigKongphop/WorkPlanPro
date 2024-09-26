@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'create_note_screen.dart';
-import '../models/note.dart';
 import 'account_page.dart';
+import 'notification_page.dart';
 import 'calendar_page.dart';
 import 'group_page.dart';
+import 'create_note_screen.dart';
+import '../models/note.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -152,27 +153,72 @@ class _HomePageState extends State<HomePage> {
             _currentIndex = index;
           });
           switch (index) {
+            case 0:
+              // Already on Home page
+              break;
             case 1:
-              Navigator.push(context, MaterialPageRoute(builder: (context) => AccountPage()));
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => AccountPage()));
+              break;
+            case 2:
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => NotificationPage()));
               break;
             case 3:
-              Navigator.push(context, MaterialPageRoute(builder: (context) => CalendarPage()));
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => CalendarPage()));
               break;
             case 4:
-              Navigator.push(context, MaterialPageRoute(builder: (context) => GroupPage()));
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => GroupPage()));
               break;
           }
         },
-        selectedItemColor: Color(0xFF0C5217),
-        unselectedItemColor: Colors.grey,
+        selectedItemColor: Colors.white,
+        unselectedItemColor: Color(0xFF0C5217),
         backgroundColor: Colors.white,
         type: BottomNavigationBarType.fixed,
         items: [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Account'),
-          BottomNavigationBarItem(icon: Icon(Icons.notifications), label: 'Notification'),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Calendar'),
-          BottomNavigationBarItem(icon: Icon(Icons.group), label: 'Group'),
+          BottomNavigationBarItem(
+            icon: _buildNavBarItem(Icons.home, 'Home', 0),
+            label: '',
+          ),
+          BottomNavigationBarItem(
+            icon: _buildNavBarItem(Icons.person, 'Account', 1),
+            label: '',
+          ),
+          BottomNavigationBarItem(
+            icon: _buildNavBarItem(Icons.notifications, 'Notification', 2),
+            label: '',
+          ),
+          BottomNavigationBarItem(
+            icon: _buildNavBarItem(Icons.calendar_today, 'Calendar', 3),
+            label: '',
+          ),
+          BottomNavigationBarItem(
+            icon: _buildNavBarItem(Icons.group, 'Group', 4),
+            label: '',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavBarItem(IconData icon, String label, int index) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(vertical: 5),
+      decoration: BoxDecoration(
+        color: _currentIndex == index ? Color(0xFF0C5217) : Colors.transparent,
+        borderRadius: BorderRadius.circular(0),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon,
+              color: _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
+          Text(
+            label,
+            style: TextStyle(
+                color:
+                    _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
+          )
         ],
       ),
     );
