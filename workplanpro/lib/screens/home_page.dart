@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'account_page.dart';
+import 'create_note_screen.dart';
+import '../models/note.dart';
 import 'notification_page.dart';
 import 'calendar_page.dart';
 import 'group_page.dart';
-import 'create_note_screen.dart';
-import '../models/note.dart';
+import 'account_page.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -14,11 +14,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
 
-  final List<Note> notes = [
-    Note(date: 'Jan 08', title: 'Topic 1', content: 'Content 1', rating: 0),
-    Note(date: 'Jan 09', title: 'Topic 2', content: 'Content 2', rating: 3),
-    Note(date: 'Jan 10', title: 'Topic 3', content: 'Content 3', rating: 0),
-  ];
+  final List<Note> notes = [];
 
   @override
   Widget build(BuildContext context) {
@@ -119,33 +115,33 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 10.0),
-        child: ElevatedButton.icon(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => CreateNoteScreen()),
-            );
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Color(0xFF0C5217),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(30),
-            ),
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          ),
-          icon: Icon(Icons.add, color: Colors.white),
-          label: Text(
-            "New note",
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final newNote = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => CreateNoteScreen()),
+          );
+
+          if (newNote != null && newNote is Note) {
+            setState(() {
+              notes.add(newNote);
+            });
+          }
+        },
+        backgroundColor: Color(0xFF0C5217),
+        icon: Icon(Icons.add , color: Colors.white),
+        label: Text(
+          'New Activity',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
           ),
         ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(30.0)),
+        ),
       ),
+
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {

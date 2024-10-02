@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../models/note.dart';
 
 class CreateNoteScreen extends StatefulWidget {
   @override
@@ -9,6 +10,9 @@ class CreateNoteScreen extends StatefulWidget {
 class _CreateNoteScreenState extends State<CreateNoteScreen> {
   DateTime currentDate = DateTime.now();
   int _rating = 0;
+
+  TextEditingController titleController = TextEditingController();
+  TextEditingController contentController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -22,8 +26,7 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
           style: TextStyle(color: Colors.white),
         ),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back,
-              color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -42,12 +45,14 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
             ),
             SizedBox(height: 8.0),
             TextFormField(
+              controller: titleController,
               decoration: InputDecoration(
                 labelText: 'Title',
               ),
             ),
             SizedBox(height: 8.0),
             TextFormField(
+              controller: contentController,
               decoration: InputDecoration(
                 labelText: 'Content',
               ),
@@ -82,7 +87,7 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
               children: [
                 ElevatedButton(
                   onPressed: () {
-                    // Implement delete functionality
+                    // Delete functionality can be added
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Color(0xFFD15353),
@@ -98,7 +103,17 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    // Implement save functionality
+                    // Create a new note and return it to the previous screen
+                    if (titleController.text.isNotEmpty &&
+                        contentController.text.isNotEmpty) {
+                      Note newNote = Note(
+                        date: formattedDate,
+                        title: titleController.text,
+                        content: contentController.text,
+                        rating: _rating,
+                      );
+                      Navigator.pop(context, newNote);
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Color(0xFF40884B),

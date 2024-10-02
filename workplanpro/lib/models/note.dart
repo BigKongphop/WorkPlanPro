@@ -7,7 +7,7 @@ class Note {
   Note({
     required this.date,
     required this.title,
-    required this.content,
+    required this.content, 
     required this.rating,
   });
 }
