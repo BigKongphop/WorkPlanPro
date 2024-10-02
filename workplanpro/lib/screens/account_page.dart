@@ -3,6 +3,7 @@ import 'home_page.dart';
 import 'notification_page.dart';
 import 'calendar_page.dart';
 import 'group_page.dart';
+import 'login_page.dart'; // นำเข้าหน้า LoginPage
 
 class AccountPage extends StatefulWidget {
   @override
@@ -68,7 +69,13 @@ class _AccountPageState extends State<AccountPage> {
             AccountDetailRow(title: 'Phone number', detail: '06-2589-6377'),
             SizedBox(height: 30),
             ElevatedButton(
-              onPressed: () {},
+              onPressed: () {
+                // เมื่อกดปุ่มนี้จะนำไปยังหน้า Login
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => LoginPage()),
+                );
+              },
               child: Text('Log out'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Color(0xFF5A5A5A),
