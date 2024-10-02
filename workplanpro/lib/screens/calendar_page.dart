@@ -4,6 +4,8 @@ import 'home_page.dart';
 import 'account_page.dart';
 import 'group_page.dart';
 import 'notification_page.dart';
+import 'add_activity_screen.dart';
+import '../models/activity.dart';
 
 class CalendarPage extends StatefulWidget {
   @override
@@ -12,6 +14,9 @@ class CalendarPage extends StatefulWidget {
 
 class _CalendarPageState extends State<CalendarPage> {
   int _currentIndex = 3;
+  DateTime _currentMonth = DateTime.now();
+  List<Activity> _personalActivities = [];
+  List<Activity> _groupActivities = [];
 
   @override
   Widget build(BuildContext context) {
@@ -32,10 +37,11 @@ class _CalendarPageState extends State<CalendarPage> {
           Expanded(
             child: Container(
               color: Colors.white,
-              child: Column(
+              child: ListView(
                 children: [
-                  _buildDropdownButton('Personal Activities'),
-                  _buildDropdownButton('Group Activities'),
+                  _buildActivitiesList(
+                      'Personal Activities', _personalActivities),
+                  _buildActivitiesList('Group Activities', _groupActivities),
                 ],
               ),
             ),
@@ -45,8 +51,16 @@ class _CalendarPageState extends State<CalendarPage> {
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 10.0),
         child: ElevatedButton.icon(
-          onPressed: () {
-            // Action for creating a new activity
+          onPressed: () async {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => AddActivityScreen()),
+            );
+            if (result != null && result is Activity) {
+              setState(() {
+                _personalActivities.add(result);
+              });
+            }
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: Color(0xFF0C5217),
@@ -148,9 +162,9 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   Widget _buildCalendar() {
+    final daysInMonth =
+        DateTime(_currentMonth.year, _currentMonth.month + 1, 0).day;
     final now = DateTime.now();
-    final firstDayOfMonth = DateTime(now.year, now.month, 1);
-    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
 
     return Container(
       padding: EdgeInsets.all(16),
@@ -160,14 +174,31 @@ class _CalendarPageState extends State<CalendarPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              IconButton(
+                icon: Icon(Icons.chevron_left, color: Colors.white),
+                onPressed: () {
+                  setState(() {
+                    _currentMonth = DateTime(
+                        _currentMonth.year, _currentMonth.month - 1, 1);
+                  });
+                },
+              ),
               Text(
-                DateFormat('MMMM yyyy').format(now),
+                DateFormat('MMMM yyyy').format(_currentMonth),
                 style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.bold),
               ),
-              Icon(Icons.arrow_drop_down, color: Colors.white),
+              IconButton(
+                icon: Icon(Icons.chevron_right, color: Colors.white),
+                onPressed: () {
+                  setState(() {
+                    _currentMonth = DateTime(
+                        _currentMonth.year, _currentMonth.month + 1, 1);
+                  });
+                },
+              ),
             ],
           ),
           SizedBox(height: 10),
@@ -188,13 +219,23 @@ class _CalendarPageState extends State<CalendarPage> {
                         Text(weekday, style: TextStyle(color: Colors.white)));
               }
               final day = index - 6;
-              final date = DateTime(now.year, now.month, day);
-              final isToday = date.day == now.day;
-              final isSelected = day == 15;
+              final date =
+                  DateTime(_currentMonth.year, _currentMonth.month, day);
+              final isToday = date.day == now.day &&
+                  date.month == now.month &&
+                  date.year == now.year;
+              final hasActivity = _personalActivities.any((activity) =>
+                      activity.date.year == date.year &&
+                      activity.date.month == date.month &&
+                      activity.date.day == date.day) ||
+                  _groupActivities.any((activity) =>
+                      activity.date.year == date.year &&
+                      activity.date.month == date.month &&
+                      activity.date.day == date.day);
               return Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isSelected
+                  color: hasActivity
                       ? Colors.white
                       : (isToday ? Colors.white.withOpacity(0.3) : null),
                 ),
@@ -202,8 +243,8 @@ class _CalendarPageState extends State<CalendarPage> {
                   child: Text(
                     '$day',
                     style: TextStyle(
-                      color: isSelected ? Color(0xFF0C5217) : Colors.white,
-                      fontWeight: isToday || isSelected
+                      color: hasActivity ? Color(0xFF0C5217) : Colors.white,
+                      fontWeight: isToday || hasActivity
                           ? FontWeight.bold
                           : FontWeight.normal,
                     ),
@@ -217,30 +258,57 @@ class _CalendarPageState extends State<CalendarPage> {
     );
   }
 
-  Widget _buildDropdownButton(String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: Container(
-        width: double.infinity,
-        child: DropdownButton<String>(
-          value: text,
-          icon: Icon(Icons.arrow_drop_down),
-          iconSize: 24,
-          elevation: 16,
-          style: TextStyle(color: Colors.black),
-          underline: Container(
-            height: 2,
-            color: Color(0xFF0C5217),
+  Widget _buildActivitiesList(String title, List<Activity> activities) {
+    return ExpansionTile(
+      title: Text(title),
+      children: [
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: 150,
           ),
-          onChanged: (String? newValue) {},
-          items: <String>[text].map<DropdownMenuItem<String>>((String value) {
-            return DropdownMenuItem<String>(
-              value: value,
-              child: Text(value),
-            );
-          }).toList(),
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: activities.length,
+            itemBuilder: (context, index) {
+              final activity = activities[index];
+              return ListTile(
+                title: Text(activity.title),
+                subtitle: Text(
+                    '${DateFormat('MMM d, y').format(activity.date)} ${activity.startTime.format(context)} - ${activity.endTime.format(context)}'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.edit),
+                      onPressed: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) =>
+                                  AddActivityScreen(activityToEdit: activity)),
+                        );
+                        if (result != null && result is Activity) {
+                          setState(() {
+                            activities[activities.indexOf(activity)] = result;
+                          });
+                        }
+                      },
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.delete),
+                      onPressed: () {
+                        setState(() {
+                          activities.remove(activity);
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
-      ),
+      ],
     );
   }
 }
