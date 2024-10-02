@@ -31,7 +31,7 @@ class _NotificationPageState extends State<NotificationPage> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'การแจ้งเตือน',
+                'Notifications',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,
@@ -45,27 +45,27 @@ class _NotificationPageState extends State<NotificationPage> {
               children: [
                 _buildNotificationItem(
                   'UKRIT PALANISONG',
-                  'เชิญเข้าร่วมกลุ่ม',
+                  'Invited you to join a group',
                   true,
                 ),
                 _buildNotificationItem(
                   'UKRIT PALANISONG',
-                  'หัวข้อ........................',
+                  'Topic........................',
                   false,
                 ),
                 _buildNotificationItem(
                   'UKRIT PALANISONG',
-                  'หัวข้อ........................',
+                  'Topic........................',
                   false,
                 ),
                 _buildNotificationItem(
                   'UKRIT PALANISONG',
-                  'หัวข้อ........................',
+                  'Topic........................',
                   false,
                 ),
                 _buildNotificationItem(
                   'UKRIT PALANISONG',
-                  'หัวข้อ........................',
+                  'Topic........................',
                   false,
                 ),
               ],
@@ -81,19 +81,22 @@ class _NotificationPageState extends State<NotificationPage> {
           });
           switch (index) {
             case 0:
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
+              Navigator.pushReplacement(
+                  context, MaterialPageRoute(builder: (context) => HomePage()));
               break;
             case 1:
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => AccountPage()));
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (context) => AccountPage()));
               break;
             case 2:
-              // Already on Notification page
               break;
             case 3:
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => CalendarPage()));
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (context) => CalendarPage()));
               break;
             case 4:
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => GroupPage()));
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (context) => GroupPage()));
               break;
           }
         },
@@ -183,7 +186,7 @@ class _NotificationPageState extends State<NotificationPage> {
                 children: [
                   ElevatedButton(
                     onPressed: () {},
-                    child: Text('ปฏิเสธ'),
+                    child: Text('Decline'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
                       foregroundColor: Colors.white,
@@ -192,7 +195,7 @@ class _NotificationPageState extends State<NotificationPage> {
                   SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: () {},
-                    child: Text('ยอมรับ'),
+                    child: Text('Accept'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Color(0xFF0C5217),
                       foregroundColor: Colors.white,

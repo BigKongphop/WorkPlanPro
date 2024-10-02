@@ -15,9 +15,9 @@ class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
 
   final List<Note> notes = [
-    Note(date: '08 ม.ค.', title: 'หัวข้อ 1', content: 'เนื้อหา 1', rating: 0),
-    Note(date: '09 ม.ค.', title: 'หัวข้อ 2', content: 'เนื้อหา 2', rating: 3),
-    Note(date: '10 ม.ค.', title: 'หัวข้อ 3', content: 'เนื้อหา 3', rating: 0),
+    Note(date: 'Jan 08', title: 'Topic 1', content: 'Content 1', rating: 0),
+    Note(date: 'Jan 09', title: 'Topic 2', content: 'Content 2', rating: 3),
+    Note(date: 'Jan 10', title: 'Topic 3', content: 'Content 3', rating: 0),
   ];
 
   @override
@@ -59,7 +59,7 @@ class _HomePageState extends State<HomePage> {
                   backgroundColor: Color(0xFF0C5217),
                 ),
                 child: Text(
-                  'สำคัญมาก',
+                  'Important',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,
@@ -73,7 +73,7 @@ class _HomePageState extends State<HomePage> {
                   backgroundColor: Color(0xFF0C5217),
                 ),
                 child: Text(
-                  'ทำประจำ',
+                  'Routine',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 18,
@@ -154,19 +154,22 @@ class _HomePageState extends State<HomePage> {
           });
           switch (index) {
             case 0:
-              // Already on Home page
               break;
             case 1:
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => AccountPage()));
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (context) => AccountPage()));
               break;
             case 2:
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => NotificationPage()));
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (context) => NotificationPage()));
               break;
             case 3:
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => CalendarPage()));
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (context) => CalendarPage()));
               break;
             case 4:
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => GroupPage()));
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (context) => GroupPage()));
               break;
           }
         },

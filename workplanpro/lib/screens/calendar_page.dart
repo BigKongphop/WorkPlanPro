@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import 'home_page.dart';
 import 'account_page.dart';
 import 'group_page.dart';
-import 'notification_page.dart'; // Add this import
+import 'notification_page.dart';
 
 class CalendarPage extends StatefulWidget {
   @override
@@ -34,27 +34,37 @@ class _CalendarPageState extends State<CalendarPage> {
               color: Colors.white,
               child: Column(
                 children: [
-                  _buildDropdownButton('กิจกรรมส่วนตัว'),
-                  _buildDropdownButton('กิจกรรมกลุ่ม'),
-                  Spacer(),
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: ElevatedButton.icon(
-                      onPressed: () {},
-                      icon: Icon(Icons.add),
-                      label: Text('New activity'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF0C5217),
-                        foregroundColor: Colors.white,
-                        minimumSize: Size(double.infinity, 50),
-                      ),
-                    ),
-                  ),
+                  _buildDropdownButton('Personal Activities'),
+                  _buildDropdownButton('Group Activities'),
                 ],
               ),
             ),
           ),
         ],
+      ),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 10.0),
+        child: ElevatedButton.icon(
+          onPressed: () {
+            // Action for creating a new activity
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Color(0xFF0C5217),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30),
+            ),
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          ),
+          icon: Icon(Icons.add, color: Colors.white),
+          label: Text(
+            "New Activity",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
@@ -76,7 +86,6 @@ class _CalendarPageState extends State<CalendarPage> {
                   MaterialPageRoute(builder: (context) => NotificationPage()));
               break;
             case 3:
-              // Already on Calendar page
               break;
             case 4:
               Navigator.pushReplacement(context,
@@ -172,7 +181,8 @@ class _CalendarPageState extends State<CalendarPage> {
             itemCount: 7 + daysInMonth,
             itemBuilder: (context, index) {
               if (index < 7) {
-                final weekday = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'][index];
+                final weekday =
+                    ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][index];
                 return Center(
                     child:
                         Text(weekday, style: TextStyle(color: Colors.white)));

@@ -63,13 +63,13 @@ class _AccountPageState extends State<AccountPage> {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 20),
-            AccountDetailRow(title: 'ชื่อผู้ใช้', detail: 'UKRIT PALANISONG'),
-            AccountDetailRow(title: 'อีเมล', detail: 'Ukrit.Pala@gmail.net'),
-            AccountDetailRow(title: 'เบอร์โทรศัพท์', detail: '06-2589-6377'),
+            AccountDetailRow(title: 'Username', detail: 'UKRIT PALANISONG'),
+            AccountDetailRow(title: 'Email', detail: 'Ukrit.Pala@gmail.net'),
+            AccountDetailRow(title: 'Phone number', detail: '06-2589-6377'),
             SizedBox(height: 30),
             ElevatedButton(
               onPressed: () {},
-              child: Text('ออกจากระบบ'),
+              child: Text('Log out'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Color(0xFF5A5A5A),
                 padding: EdgeInsets.symmetric(horizontal: 100, vertical: 15),
@@ -88,19 +88,22 @@ class _AccountPageState extends State<AccountPage> {
           });
           switch (index) {
             case 0:
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
+              Navigator.pushReplacement(
+                  context, MaterialPageRoute(builder: (context) => HomePage()));
               break;
             case 1:
-              // Already on Account page
               break;
             case 2:
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => NotificationPage()));
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (context) => NotificationPage()));
               break;
             case 3:
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => CalendarPage()));
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (context) => CalendarPage()));
               break;
             case 4:
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => GroupPage()));
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (context) => GroupPage()));
               break;
           }
         },
@@ -187,7 +190,7 @@ class AccountDetailRow extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () {},
-            child: Text('แก้ไข'),
+            child: Text('Edit'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Color(0xFF5A5A5A),
               foregroundColor: Colors.white,

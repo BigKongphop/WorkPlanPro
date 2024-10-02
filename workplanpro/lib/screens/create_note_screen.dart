@@ -11,8 +11,7 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
 
   @override
   Widget build(BuildContext context) {
-    String formattedDate =
-        DateFormat('dd MMM. yyyy').format(currentDate);
+    String formattedDate = DateFormat('dd MMM. yyyy').format(currentDate);
 
     return Scaffold(
       appBar: AppBar(
@@ -49,8 +48,7 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
             Row(
               children: List.generate(3, (index) {
                 return IconButton(
-                  onPressed: () {
-                  },
+                  onPressed: () {},
                   icon: Icon(
                     Icons.star_border,
                     color: Color(0xFF0C5217),
@@ -63,8 +61,7 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 ElevatedButton(
-                  onPressed: () {
-                  },
+                  onPressed: () {},
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Color(0xFFD15353),
                   ),
@@ -78,8 +75,7 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
                   ),
                 ),
                 ElevatedButton(
-                  onPressed: () {
-                  },
+                  onPressed: () {},
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Color(0xFF40884B),
                   ),

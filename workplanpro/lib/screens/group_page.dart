@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'home_page.dart';
 import 'account_page.dart';
 import 'calendar_page.dart';
-import 'notification_page.dart'; // Add this import
+import 'notification_page.dart';
 
 class GroupPage extends StatefulWidget {
   @override
@@ -18,7 +18,7 @@ class _GroupPageState extends State<GroupPage> {
       backgroundColor: Color(0xFF0C5217),
       appBar: AppBar(
         backgroundColor: Color(0xFF0C5217),
-        title: Text('รายชื่อกลุ่ม', style: TextStyle(color: Colors.white)),
+        title: Text('Group List', style: TextStyle(color: Colors.white)),
         elevation: 0,
       ),
       body: Column(
@@ -57,10 +57,10 @@ class _GroupPageState extends State<GroupPage> {
                       child: Icon(Icons.person, color: Colors.grey[600]),
                     ),
                     title: Text(
-                      index == 0 ? 'UKRIT PALANISONG' : 'ชื่อกลุ่ม',
+                      index == 0 ? 'UKRIT PALANISONG' : 'Group Name',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    subtitle: Text(index == 0 ? '' : 'ชื่อผู้สร้าง'),
+                    subtitle: Text(index == 0 ? '' : 'Creator Name'),
                     trailing: Icon(Icons.more_vert),
                   );
                 },
@@ -69,11 +69,29 @@ class _GroupPageState extends State<GroupPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {},
-        icon: Icon(Icons.add),
-        label: Text('New Group'),
-        backgroundColor: Color(0xFF0C5217),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 10.0),
+        child: ElevatedButton.icon(
+          onPressed: () {
+            // Action for creating a new group
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Color(0xFF0C5217),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30),
+            ),
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          ),
+          icon: Icon(Icons.add, color: Colors.white),
+          label: Text(
+            "New Group",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
@@ -99,7 +117,6 @@ class _GroupPageState extends State<GroupPage> {
                   MaterialPageRoute(builder: (context) => CalendarPage()));
               break;
             case 4:
-              // Already on Group page
               break;
           }
         },
