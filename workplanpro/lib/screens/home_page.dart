@@ -84,29 +84,36 @@ class _HomePageState extends State<HomePage> {
               itemCount: notes.length,
               itemBuilder: (context, index) {
                 final note = notes[index];
-                return Card(
-                  margin: EdgeInsets.all(8.0),
-                  child: Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(note.date,
-                            style: TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold)),
-                        Text(note.title, style: TextStyle(fontSize: 16)),
-                        SizedBox(height: 8.0),
-                        Row(
-                          children: List.generate(3, (i) {
-                            return Icon(
-                              i < note.rating ? Icons.star : Icons.star_border,
-                              color: i < note.rating
-                                  ? Color(0xFF0C5217)
-                                  : Colors.grey,
-                            );
-                          }),
-                        ),
-                      ],
+                return GestureDetector(
+                  onTap: () {
+                    _showNoteDetail(context, note, index);
+                  },
+                  child: Card(
+                    margin: EdgeInsets.all(8.0),
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(note.date,
+                              style: TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.bold)),
+                          Text(note.title, style: TextStyle(fontSize: 16)),
+                          SizedBox(height: 8.0),
+                          Row(
+                            children: List.generate(3, (i) {
+                              return Icon(
+                                i < note.rating
+                                    ? Icons.star
+                                    : Icons.star_border,
+                                color: i < note.rating
+                                    ? Color(0xFF0C5217)
+                                    : Colors.grey,
+                              );
+                            }),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );
@@ -129,7 +136,7 @@ class _HomePageState extends State<HomePage> {
           }
         },
         backgroundColor: Color(0xFF0C5217),
-        icon: Icon(Icons.add , color: Colors.white),
+        icon: Icon(Icons.add, color: Colors.white),
         label: Text(
           'New Activity',
           style: TextStyle(
@@ -141,7 +148,6 @@ class _HomePageState extends State<HomePage> {
           borderRadius: BorderRadius.all(Radius.circular(30.0)),
         ),
       ),
-
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
@@ -197,6 +203,124 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
     );
+  }
+
+  void _showNoteDetail(BuildContext context, Note note, int index) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
+      ),
+      builder: (BuildContext context) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          builder: (context, scrollController) {
+            return SingleChildScrollView(
+              controller: scrollController,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'รายละเอียดโน้ต',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 20.0,
+                            color: Color(0xFF0C5217),
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.close, color: Colors.grey),
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 16.0),
+                    Text(
+                      note.title,
+                      style: TextStyle(
+                        fontSize: 18.0,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 8.0),
+                    Text(
+                      note.content,
+                      style: TextStyle(fontSize: 16.0),
+                    ),
+                    SizedBox(height: 16.0),
+                    Row(
+                      children: List.generate(3, (i) {
+                        return Icon(
+                          i < note.rating ? Icons.star : Icons.star_border,
+                          color:
+                              i < note.rating ? Color(0xFF0C5217) : Colors.grey,
+                        );
+                      }),
+                    ),
+                    SizedBox(height: 16.0),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () {
+                            _editNote(context, note, index);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFF0C5217),
+                          ),
+                          child: Text('แก้ไข',
+                              style: TextStyle(color: Colors.white)),
+                        ),
+                        SizedBox(width: 8.0),
+                        ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              notes.removeAt(index);
+                            });
+                            Navigator.pop(context);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                          ),
+                          child:
+                              Text('ลบ', style: TextStyle(color: Colors.white)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _editNote(BuildContext context, Note note, int index) async {
+    final updatedNote = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreateNoteScreen(),
+      ),
+    );
+
+    if (updatedNote != null && updatedNote is Note) {
+      setState(() {
+        notes[index] = updatedNote;
+      });
+    }
   }
 
   Widget _buildNavBarItem(IconData icon, String label, int index) {

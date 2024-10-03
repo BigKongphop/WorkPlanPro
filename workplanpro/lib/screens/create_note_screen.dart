@@ -48,6 +48,20 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
               controller: titleController,
               decoration: InputDecoration(
                 labelText: 'Title',
+                labelStyle: TextStyle(color: Color(0xFF0C5217)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                  borderSide: BorderSide(
+                    color: Color(0xFF0C5217),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                  borderSide: BorderSide(
+                    color: Color(0xFF0C5217),
+                    width: 2.0,
+                  ),
+                ),
               ),
             ),
             SizedBox(height: 8.0),
@@ -55,6 +69,20 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
               controller: contentController,
               decoration: InputDecoration(
                 labelText: 'Content',
+                labelStyle: TextStyle(color: Color(0xFF0C5217)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                  borderSide: BorderSide(
+                    color: Color(0xFF0C5217),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                  borderSide: BorderSide(
+                    color: Color(0xFF0C5217),
+                    width: 2.0,
+                  ),
+                ),
               ),
               maxLines: 5,
             ),
@@ -87,44 +115,36 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
               children: [
                 ElevatedButton(
                   onPressed: () {
-                    // Delete functionality can be added
+                    Navigator.of(context).pop();
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Color(0xFFD15353),
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
                   ),
                   child: Text(
                     'Delete',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(color: Colors.white, fontSize: 16.0),
                   ),
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    // Create a new note and return it to the previous screen
-                    if (titleController.text.isNotEmpty &&
-                        contentController.text.isNotEmpty) {
-                      Note newNote = Note(
-                        date: formattedDate,
-                        title: titleController.text,
-                        content: contentController.text,
-                        rating: _rating,
-                      );
-                      Navigator.pop(context, newNote);
-                    }
+                    Note newNote = Note(
+                      title: titleController.text,
+                      content: contentController.text,
+                      date: formattedDate,
+                      rating: _rating,
+                    );
+                    Navigator.of(context).pop(newNote);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Color(0xFF40884B),
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
                   ),
                   child: Text(
                     'Save',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(color: Colors.white, fontSize: 16.0),
                   ),
                 ),
               ],
