@@ -230,7 +230,7 @@ class _HomePageState extends State<HomePage> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'รายละเอียดโน้ต',
+                          'Notedetail',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 20.0,
@@ -279,7 +279,7 @@ class _HomePageState extends State<HomePage> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Color(0xFF0C5217),
                           ),
-                          child: Text('แก้ไข',
+                          child: Text('Edit',
                               style: TextStyle(color: Colors.white)),
                         ),
                         SizedBox(width: 8.0),
@@ -294,7 +294,7 @@ class _HomePageState extends State<HomePage> {
                             backgroundColor: Colors.red,
                           ),
                           child:
-                              Text('ลบ', style: TextStyle(color: Colors.white)),
+                              Text('Delete', style: TextStyle(color: Colors.white)),
                         ),
                       ],
                     ),
