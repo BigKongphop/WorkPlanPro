@@ -34,27 +34,35 @@ class _CalendarPageState extends State<CalendarPage> {
       ),
       body: Column(
         children: [
-          ExpansionTile(
-            initiallyExpanded: _isCalendarExpanded,
-            onExpansionChanged: (expanded) {
-              setState(() {
-                _isCalendarExpanded = expanded;
-              });
-            },
-            title: Text(
-              'Calendar',
-              style:
-                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          Theme(
+            data: Theme.of(context).copyWith(
+              dividerColor: Colors.transparent,
+              colorScheme: ColorScheme.dark(
+                primary: Colors.white,
+              ),
             ),
-            trailing: Icon(
-              _isCalendarExpanded
-                  ? Icons.keyboard_arrow_up
-                  : Icons.keyboard_arrow_down,
-              color: Colors.white,
+            child: ExpansionTile(
+              initiallyExpanded: _isCalendarExpanded,
+              onExpansionChanged: (expanded) {
+                setState(() {
+                  _isCalendarExpanded = expanded;
+                });
+              },
+              title: Text(
+                'Calendar',
+                style:
+                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+              trailing: Icon(
+                _isCalendarExpanded
+                    ? Icons.keyboard_arrow_up
+                    : Icons.keyboard_arrow_down,
+                color: Colors.white,
+              ),
+              children: [
+                _buildCalendar(),
+              ],
             ),
-            children: [
-              _buildCalendar(),
-            ],
           ),
           Expanded(
             child: Container(
@@ -219,42 +227,139 @@ class _CalendarPageState extends State<CalendarPage> {
               return ListTile(
                 title: Text(activity.title),
                 subtitle: Text(
-                    '${DateFormat('MMM d, y').format(activity.date)} ${activity.startTime.format(context)} - ${activity.endTime.format(context)}'),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: Icon(Icons.edit),
-                      onPressed: () async {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) =>
-                                  AddActivityScreen(activityToEdit: activity)),
-                        );
-                        if (result != null && result is Activity) {
-                          setState(() {
-                            activities[activities.indexOf(activity)] = result;
-                          });
-                        }
-                      },
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.delete),
-                      onPressed: () {
-                        setState(() {
-                          activities.remove(activity);
-                        });
-                      },
-                    ),
-                  ],
+                  '${DateFormat('MMM d, y').format(activity.date)} ${activity.startTime.format(context)} - ${activity.endTime.format(context)}',
                 ),
+                onTap: () => _showActivityDetails(activity, index, activities),
               );
             },
           ),
         ),
       ],
     );
+  }
+
+  void _showActivityDetails(
+      Activity activity, int index, List<Activity> activities) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
+      ),
+      builder: (BuildContext context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return SingleChildScrollView(
+              controller: scrollController,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Activity Detail',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 20.0,
+                            color: Color(0xFF0C5217),
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.close, color: Colors.grey),
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 16.0),
+                    Text(
+                      activity.title,
+                      style: TextStyle(
+                        fontSize: 18.0,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 8.0),
+                    Text(
+                      'Date: ${DateFormat('EEEE, MMM d, y').format(activity.date)}',
+                      style: TextStyle(fontSize: 16.0),
+                    ),
+                    SizedBox(height: 4.0),
+                    Text(
+                      'Time: ${activity.startTime.format(context)} - ${activity.endTime.format(context)}',
+                      style: TextStyle(fontSize: 16.0),
+                    ),
+                    SizedBox(height: 16.0),
+                    Text(
+                      'Description:',
+                      style: TextStyle(
+                        fontSize: 16.0,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 4.0),
+                    Text(
+                      activity.description,
+                      style: TextStyle(fontSize: 16.0),
+                    ),
+                    SizedBox(height: 24.0),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _editActivity(activity, index, activities);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFF0C5217),
+                          ),
+                          child: Text('Edit',
+                              style: TextStyle(color: Colors.white)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _editActivity(
+      Activity activity, int index, List<Activity> activities) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddActivityScreen(activityToEdit: activity),
+      ),
+    );
+    if (result != null) {
+      setState(() {
+        if (result == 'delete') {
+          activities.removeAt(index);
+        } else if (result is Activity) {
+          activities[index] = result;
+        }
+      });
+    }
+  }
+
+  void _deleteActivity(int index, List<Activity> activities) {
+    setState(() {
+      activities.removeAt(index);
+    });
   }
 
   Widget _buildBottomNavigationBar() {
@@ -274,8 +379,8 @@ class _CalendarPageState extends State<CalendarPage> {
                 MaterialPageRoute(builder: (context) => AccountPage()));
             break;
           case 2:
-            Navigator.pushReplacement(
-                context, MaterialPageRoute(builder: (context) => HomePage()));
+            Navigator.pushReplacement(context,
+                MaterialPageRoute(builder: (context) => HomePage()));
             break;
           case 3:
             break;

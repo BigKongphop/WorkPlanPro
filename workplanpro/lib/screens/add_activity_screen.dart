@@ -4,7 +4,7 @@ import '../models/activity.dart';
 
 class AddActivityScreen extends StatefulWidget {
   final Activity? activityToEdit;
- 
+
   AddActivityScreen({this.activityToEdit});
 
   @override
@@ -32,6 +32,13 @@ class _AddActivityScreenState extends State<AddActivityScreen> {
   }
 
   @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -41,7 +48,7 @@ class _AddActivityScreenState extends State<AddActivityScreen> {
             style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: Icon(Icons.close, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => _showDiscardChangesDialog(),
         ),
       ),
       body: SingleChildScrollView(
@@ -52,7 +59,7 @@ class _AddActivityScreenState extends State<AddActivityScreen> {
             TextField(
               controller: _titleController,
               decoration: InputDecoration(
-                labelText: 'Activity Title',
+                labelText: 'Title',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -84,19 +91,7 @@ class _AddActivityScreenState extends State<AddActivityScreen> {
             ),
             SizedBox(height: 8),
             InkWell(
-              onTap: () async {
-                final DateTime? picked = await showDatePicker(
-                  context: context,
-                  initialDate: _selectedDate,
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime(2101),
-                );
-                if (picked != null && picked != _selectedDate) {
-                  setState(() {
-                    _selectedDate = picked;
-                  });
-                }
-              },
+              onTap: () => _selectDate(context),
               child: InputDecorator(
                 decoration: InputDecoration(
                   border: OutlineInputBorder(
@@ -119,17 +114,7 @@ class _AddActivityScreenState extends State<AddActivityScreen> {
               children: [
                 Expanded(
                   child: InkWell(
-                    onTap: () async {
-                      final TimeOfDay? picked = await showTimePicker(
-                        context: context,
-                        initialTime: _startTime,
-                      );
-                      if (picked != null && picked != _startTime) {
-                        setState(() {
-                          _startTime = picked;
-                        });
-                      }
-                    },
+                    onTap: () => _selectTime(context, isStartTime: true),
                     child: InputDecorator(
                       decoration: InputDecoration(
                         labelText: 'Start Time',
@@ -146,17 +131,7 @@ class _AddActivityScreenState extends State<AddActivityScreen> {
                 SizedBox(width: 16),
                 Expanded(
                   child: InkWell(
-                    onTap: () async {
-                      final TimeOfDay? picked = await showTimePicker(
-                        context: context,
-                        initialTime: _endTime,
-                      );
-                      if (picked != null && picked != _endTime) {
-                        setState(() {
-                          _endTime = picked;
-                        });
-                      }
-                    },
+                    onTap: () => _selectTime(context, isStartTime: false),
                     child: InputDecorator(
                       decoration: InputDecoration(
                         labelText: 'End Time',
@@ -173,37 +148,178 @@ class _AddActivityScreenState extends State<AddActivityScreen> {
               ],
             ),
             SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Activity activity = Activity(
-                    title: _titleController.text,
-                    description: _descriptionController.text,
-                    date: _selectedDate,
-                    startTime: _startTime,
-                    endTime: _endTime,
-                  );
-                  Navigator.of(context).pop(activity);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF0C5217),
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            Row(
+              children: [
+                if (widget.activityToEdit != null)
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => _showDeleteConfirmationDialog(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Delete',
+                        style: TextStyle(fontSize: 18, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                if (widget.activityToEdit != null) SizedBox(width: 16),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _showSaveConfirmationDialog(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF0C5217),
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      widget.activityToEdit == null ? 'Save' : 'Update',
+                      style: TextStyle(fontSize: 18, color: Colors.white),
+                    ),
                   ),
                 ),
-                child: Text(
-                  widget.activityToEdit == null
-                      ? 'Save Activity'
-                      : 'Update Activity',
-                  style: TextStyle(fontSize: 18, color: Colors.white),
-                ),
-              ),
+              ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2101),
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+      });
+    }
+  }
+
+  Future<void> _selectTime(BuildContext context,
+      {required bool isStartTime}) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: isStartTime ? _startTime : _endTime,
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStartTime) {
+          _startTime = picked;
+        } else {
+          _endTime = picked;
+        }
+      });
+    }
+  }
+
+  void _showDiscardChangesDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Discard Changes?'),
+          content: Text('Are you sure you want to discard your changes?'),
+          actions: <Widget>[
+            TextButton(
+              child: Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('Discard'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showSaveConfirmationDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(widget.activityToEdit == null
+              ? 'Save Activity?'
+              : 'Update Activity?'),
+          content: Text(
+              'Are you sure you want to ${widget.activityToEdit == null ? 'save' : 'update'} this activity?'),
+          actions: <Widget>[
+            TextButton(
+              child: Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('Confirm'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _saveActivity();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showDeleteConfirmationDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Delete Activity?'),
+          content: Text(
+              'Are you sure you want to delete this activity? This action cannot be undone.'),
+          actions: <Widget>[
+            TextButton(
+              child: Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('Delete'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteActivity();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _saveActivity() {
+    Activity activity = Activity(
+      title: _titleController.text,
+      description: _descriptionController.text,
+      date: _selectedDate,
+      startTime: _startTime,
+      endTime: _endTime,
+    );
+    Navigator.of(context).pop(activity);
+  }
+
+  void _deleteActivity() {
+    Navigator.of(context).pop('delete');
   }
 }
