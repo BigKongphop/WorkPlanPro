@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:workplanpro/screens/regis_page.dart';
 import 'account_page.dart';
+import '../models/user_database.dart'; // Import UserDatabase
 
 class LoginPage extends StatefulWidget {
   @override
@@ -8,7 +10,11 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  bool _isPasswordVisible = false; // Toggle password visibility
+  bool _isPasswordVisible = false;
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final UserDatabase _userDatabase =
+      UserDatabase(); // Create UserDatabase instance
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +50,7 @@ class _LoginPageState extends State<LoginPage> {
                 SizedBox(height: 20),
                 // Username Input
                 TextField(
+                  controller: _usernameController,
                   decoration: InputDecoration(
                     labelText: 'Username',
                     border: OutlineInputBorder(
@@ -55,10 +62,14 @@ class _LoginPageState extends State<LoginPage> {
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(20),
+                  ],
                 ),
                 SizedBox(height: 20),
                 // Password Input
                 TextField(
+                  controller: _passwordController,
                   obscureText: !_isPasswordVisible,
                   decoration: InputDecoration(
                     labelText: 'Password',
@@ -84,15 +95,31 @@ class _LoginPageState extends State<LoginPage> {
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(20),
+                  ],
                 ),
                 SizedBox(height: 30),
                 // Login Button
                 ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (context) => AccountPage()),
+                  onPressed: () async {
+                    // ตรวจสอบการเข้าสู่ระบบ
+                    final isValid = await _userDatabase.isValidLogin(
+                      _usernameController.text,
+                      _passwordController.text,
                     );
+
+                    if (isValid) {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (context) => AccountPage()),
+                      );
+                    } else {
+                      // แสดงข้อความผิดพลาด
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Invalid username or password')),
+                      );
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Color(0xFF0C5217),
