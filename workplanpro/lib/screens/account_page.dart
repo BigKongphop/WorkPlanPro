@@ -95,14 +95,14 @@ class _AccountPageState extends State<AccountPage> {
           });
           switch (index) {
             case 0:
-              Navigator.pushReplacement(
-                  context, MaterialPageRoute(builder: (context) => HomePage()));
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (context) => NotificationPage()));
               break;
             case 1:
               break;
             case 2:
               Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (context) => NotificationPage()));
+                  MaterialPageRoute(builder: (context) => HomePage()));
               break;
             case 3:
               Navigator.pushReplacement(context,
@@ -128,7 +128,7 @@ class _AccountPageState extends State<AccountPage> {
             label: '',
           ),
           BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.notifications, 'Notification', 2),
+            icon: _buildNavBarItem(Icons.book, 'Note', 2),
             label: '',
           ),
           BottomNavigationBarItem(

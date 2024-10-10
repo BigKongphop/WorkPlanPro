@@ -101,8 +101,8 @@ class _GroupPageState extends State<GroupPage> {
           });
           switch (index) {
             case 0:
-              Navigator.pushReplacement(
-                  context, MaterialPageRoute(builder: (context) => HomePage()));
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (context) => NotificationPage()));
               break;
             case 1:
               Navigator.pushReplacement(context,
@@ -110,7 +110,7 @@ class _GroupPageState extends State<GroupPage> {
               break;
             case 2:
               Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (context) => NotificationPage()));
+                  MaterialPageRoute(builder: (context) => HomePage()));
               break;
             case 3:
               Navigator.pushReplacement(context,
@@ -134,7 +134,7 @@ class _GroupPageState extends State<GroupPage> {
             label: '',
           ),
           BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.notifications, 'Notification', 2),
+            icon: _buildNavBarItem(Icons.book, 'Note', 2),
             label: '',
           ),
           BottomNavigationBarItem(

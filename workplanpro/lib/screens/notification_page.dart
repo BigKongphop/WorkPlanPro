@@ -10,14 +10,14 @@ class NotificationPage extends StatefulWidget {
 }
 
 class _NotificationPageState extends State<NotificationPage> {
-  int _currentIndex = 2;
+  int _currentIndex = 0;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Color(0xFF0C5217),
-        title: Text('NOTIFICATION', style: TextStyle(color: Colors.white)),
+        title: Text('HOME', style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
@@ -31,7 +31,7 @@ class _NotificationPageState extends State<NotificationPage> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Notifications',
+                'Home',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 18,
@@ -81,14 +81,14 @@ class _NotificationPageState extends State<NotificationPage> {
           });
           switch (index) {
             case 0:
-              Navigator.pushReplacement(
-                  context, MaterialPageRoute(builder: (context) => HomePage()));
               break;
             case 1:
               Navigator.pushReplacement(context,
                   MaterialPageRoute(builder: (context) => AccountPage()));
               break;
             case 2:
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (context) => HomePage()));
               break;
             case 3:
               Navigator.pushReplacement(context,
@@ -114,7 +114,7 @@ class _NotificationPageState extends State<NotificationPage> {
             label: '',
           ),
           BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.notifications, 'Notification', 2),
+            icon: _buildNavBarItem(Icons.book, 'Note', 2),
             label: '',
           ),
           BottomNavigationBarItem(

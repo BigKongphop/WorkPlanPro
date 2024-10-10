@@ -12,7 +12,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _currentIndex = 0;
+  int _currentIndex = 2;
 
   final List<Note> notes = [];
 
@@ -138,7 +138,7 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: Color(0xFF0C5217),
         icon: Icon(Icons.add, color: Colors.white),
         label: Text(
-          'New Activity',
+          'New Note',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
@@ -156,14 +156,14 @@ class _HomePageState extends State<HomePage> {
           });
           switch (index) {
             case 0:
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (context) => NotificationPage()));
               break;
             case 1:
               Navigator.pushReplacement(context,
                   MaterialPageRoute(builder: (context) => AccountPage()));
               break;
             case 2:
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (context) => NotificationPage()));
               break;
             case 3:
               Navigator.pushReplacement(context,
@@ -189,7 +189,7 @@ class _HomePageState extends State<HomePage> {
             label: '',
           ),
           BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.notifications, 'Notification', 2),
+            icon: _buildNavBarItem(Icons.book, 'Note', 2),
             label: '',
           ),
           BottomNavigationBarItem(
@@ -293,8 +293,8 @@ class _HomePageState extends State<HomePage> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.red,
                           ),
-                          child:
-                              Text('Delete', style: TextStyle(color: Colors.white)),
+                          child: Text('Delete',
+                              style: TextStyle(color: Colors.white)),
                         ),
                       ],
                     ),
