@@ -131,7 +131,7 @@ class _HomePageState extends State<HomePage> {
 
           if (newNote != null && newNote is Note) {
             setState(() {
-              notes.add(newNote);
+              notes.insert(0, newNote);
             });
           }
         },
@@ -341,8 +341,9 @@ class _HomePageState extends State<HomePage> {
                   notes.removeAt(index);
                 });
                 Navigator.of(context).pop();
+                Navigator.of(context).pop();
               },
-              child: Text('Delete'),
+              child: Text('Delete', style: TextStyle(color: Colors.red)),
             ),
           ],
         );
