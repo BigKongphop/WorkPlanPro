@@ -89,6 +89,7 @@ class _CalendarPageState extends State<CalendarPage> {
             if (result != null && result is Activity) {
               setState(() {
                 _personalActivities.add(result);
+                _sortActivities();
               });
             }
           },
@@ -352,8 +353,26 @@ class _CalendarPageState extends State<CalendarPage> {
         } else if (result is Activity) {
           activities[index] = result;
         }
+        _sortActivities();
       });
     }
+  }
+
+  void _sortActivities() {
+    _personalActivities.sort((a, b) {
+      int dateComparison = b.date.compareTo(a.date);
+      if (dateComparison != 0) return dateComparison;
+      return b.startTime.hour * 60 +
+          b.startTime.minute -
+          (a.startTime.hour * 60 + a.startTime.minute);
+    });
+    _groupActivities.sort((a, b) {
+      int dateComparison = b.date.compareTo(a.date);
+      if (dateComparison != 0) return dateComparison;
+      return b.startTime.hour * 60 +
+          b.startTime.minute -
+          (a.startTime.hour * 60 + a.startTime.minute);
+    });
   }
 
   void _deleteActivity(int index, List<Activity> activities) {
@@ -379,8 +398,8 @@ class _CalendarPageState extends State<CalendarPage> {
                 MaterialPageRoute(builder: (context) => AccountPage()));
             break;
           case 2:
-            Navigator.pushReplacement(context,
-                MaterialPageRoute(builder: (context) => HomePage()));
+            Navigator.pushReplacement(
+                context, MaterialPageRoute(builder: (context) => HomePage()));
             break;
           case 3:
             break;
