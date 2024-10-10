@@ -3,26 +3,40 @@ import 'package:intl/intl.dart';
 import '../models/note.dart';
 
 class CreateNoteScreen extends StatefulWidget {
+  final Note? note;  
+
+  CreateNoteScreen({this.note});
+
   @override
   _CreateNoteScreenState createState() => _CreateNoteScreenState();
 }
 
 class _CreateNoteScreenState extends State<CreateNoteScreen> {
-  DateTime currentDate = DateTime.now();
-  int _rating = 0;
+  late int _rating;
 
-  TextEditingController titleController = TextEditingController();
-  TextEditingController contentController = TextEditingController();
+  late TextEditingController titleController;
+  late TextEditingController contentController;
+
+  @override
+  void initState() {
+    super.initState();
+    
+
+    _rating = widget.note?.rating ?? 0;
+
+    titleController = TextEditingController(text: widget.note?.title ?? '');
+    contentController = TextEditingController(text: widget.note?.content ?? '');
+  }
 
   @override
   Widget build(BuildContext context) {
-    String formattedDate = DateFormat('dd MMM. yyyy').format(currentDate);
+    String formattedDate = widget.note?.date ?? DateFormat('dd MMM. yyyy').format(DateTime.now());
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Color(0xFF0C5217),
         title: Text(
-          'NOTE',
+          widget.note != null ? 'Edit Note' : 'New Note',
           style: TextStyle(color: Colors.white),
         ),
         leading: IconButton(
@@ -129,14 +143,22 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
                           ),
                           TextButton(
                             onPressed: () {
-                              Note newNote = Note(
-                                title: titleController.text,
-                                content: contentController.text,
-                                date: formattedDate,
-                                rating: _rating,
-                              );
-                              Navigator.of(context).pop();
-                              Navigator.of(context).pop(newNote);
+                              if (widget.note != null) {
+                                widget.note!.title = titleController.text;
+                                widget.note!.content = contentController.text;
+                                widget.note!.rating = _rating;
+                                Navigator.of(context).pop();
+                                Navigator.of(context).pop(widget.note);
+                              } else {
+                                Note newNote = Note(
+                                  title: titleController.text,
+                                  content: contentController.text,
+                                  date: formattedDate,
+                                  rating: _rating,
+                                );
+                                Navigator.of(context).pop();
+                                Navigator.of(context).pop(newNote);
+                              }
                             },
                             child: Text('Save'),
                           ),

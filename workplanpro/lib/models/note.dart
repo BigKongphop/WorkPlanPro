@@ -1,8 +1,8 @@
 class Note {
   final String date;
-  final String title;
-  final String content;
-  final int rating;
+  String title;
+  String content;
+  int rating;
 
   Note({
     required this.date,

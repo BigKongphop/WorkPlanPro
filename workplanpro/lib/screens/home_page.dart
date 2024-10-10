@@ -305,20 +305,27 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _editNote(BuildContext context, Note note, int index) async {
-    final updatedNote = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CreateNoteScreen(),
-      ),
-    );
+    void _editNote(BuildContext context, Note note, int index) async {
+      final updatedNote = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CreateNoteScreen(
+            note: note,
+          ),
+        ),
+      );
 
-    if (updatedNote != null && updatedNote is Note) {
-      setState(() {
-        notes[index] = updatedNote;
-      });
+      if (updatedNote != null && updatedNote is Note) {
+        setState(() {
+          notes[index] = updatedNote;
+        });
+
+        Navigator.pop(context);
+      }
     }
-  }
+
+
+
 
   void _showDeleteConfirmationDialog(
       BuildContext context, Note note, int index) {
