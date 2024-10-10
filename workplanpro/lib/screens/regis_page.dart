@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'login_page.dart'; // นำเข้าหน้าเข้าสู่ระบบ
+import 'package:workplanpro/screens/login_page.dart';
+import 'account_page.dart';
 
 class RegisPage extends StatefulWidget {
   @override
@@ -7,6 +8,9 @@ class RegisPage extends StatefulWidget {
 }
 
 class _RegisPageState extends State<RegisPage> {
+  bool _isPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -18,29 +22,28 @@ class _RegisPageState extends State<RegisPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // รูปภาพด้านบน
+                // Image
                 Container(
                   height: 150,
                   decoration: BoxDecoration(
                     image: DecorationImage(
-                      image: AssetImage(
-                          'assets/register_image.png'), // เปลี่ยนเป็นภาพของคุณ
+                      image: AssetImage('assets/register_image.png'),
                       fit: BoxFit.contain,
                     ),
                   ),
                 ),
                 SizedBox(height: 30),
-                // ข้อความ "Create Account"
+                // "Create Account" Text
                 Text(
                   "Create Account",
                   style: TextStyle(
                     fontSize: 30,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF0C5217), // สีหลัก
+                    color: Color(0xFF0C5217),
                   ),
                 ),
                 SizedBox(height: 20),
-                // ช่องกรอก Username
+                // Username Input
                 TextField(
                   decoration: InputDecoration(
                     labelText: 'Username',
@@ -55,7 +58,7 @@ class _RegisPageState extends State<RegisPage> {
                   ),
                 ),
                 SizedBox(height: 20),
-                // ช่องกรอก Email
+                // Email Input
                 TextField(
                   decoration: InputDecoration(
                     labelText: 'Email',
@@ -70,15 +73,58 @@ class _RegisPageState extends State<RegisPage> {
                   ),
                 ),
                 SizedBox(height: 20),
-                // ช่องกรอก Password
+                // Password Input
                 TextField(
-                  obscureText: true,
+                  obscureText: !_isPasswordVisible,
                   decoration: InputDecoration(
                     labelText: 'Password',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(30),
                     ),
                     prefixIcon: Icon(Icons.lock, color: Color(0xFF0C5217)),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _isPasswordVisible
+                            ? Icons.visibility
+                            : Icons.visibility_off,
+                        color: Color(0xFF0C5217),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _isPasswordVisible = !_isPasswordVisible;
+                        });
+                      },
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF0C5217)),
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 20),
+                // Confirm Password Input
+                TextField(
+                  obscureText: !_isConfirmPasswordVisible,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm Password',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    prefixIcon: Icon(Icons.lock, color: Color(0xFF0C5217)),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _isConfirmPasswordVisible
+                            ? Icons.visibility
+                            : Icons.visibility_off,
+                        color: Color(0xFF0C5217),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _isConfirmPasswordVisible =
+                              !_isConfirmPasswordVisible;
+                        });
+                      },
+                    ),
                     focusedBorder: OutlineInputBorder(
                       borderSide: BorderSide(color: Color(0xFF0C5217)),
                       borderRadius: BorderRadius.circular(30),
@@ -86,13 +132,16 @@ class _RegisPageState extends State<RegisPage> {
                   ),
                 ),
                 SizedBox(height: 30),
-                // ปุ่ม Sign Up
+                // Sign Up Button
                 ElevatedButton(
                   onPressed: () {
-                    // โค้ดสำหรับลงทะเบียน
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (context) => AccountPage()),
+                    );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF0C5217), // สีหลัก
+                    backgroundColor: Color(0xFF0C5217),
                     padding:
                         EdgeInsets.symmetric(horizontal: 100, vertical: 15),
                     shape: RoundedRectangleBorder(
@@ -105,14 +154,14 @@ class _RegisPageState extends State<RegisPage> {
                   ),
                 ),
                 SizedBox(height: 20),
-                // ลิงค์ไปหน้าเข้าสู่ระบบ
+                // Link to Login Page
                 TextButton(
                   onPressed: () {
                     Navigator.of(context).push(_createRouteToLoginPage());
                   },
                   child: Text(
                     "Already have an account? Log in",
-                    style: TextStyle(color: Color(0xFF0C5217)), // สีหลัก
+                    style: TextStyle(color: Color(0xFF0C5217)),
                   ),
                 ),
               ],
@@ -123,19 +172,16 @@ class _RegisPageState extends State<RegisPage> {
     );
   }
 
-  // ฟังก์ชันสำหรับสร้างอนิเมชันเมื่อไปยังหน้า LoginPage
   Route _createRouteToLoginPage() {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => LoginPage(),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        const begin = Offset(-1.0, 0.0);
-        const end = Offset.zero;
-        const curve = Curves.easeInOut;
-
+        var begin = Offset(-1.0, 0.0);
+        var end = Offset.zero;
+        var curve = Curves.easeInOut;
         var tween =
             Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
         var offsetAnimation = animation.drive(tween);
-
         return SlideTransition(
           position: offsetAnimation,
           child: child,
