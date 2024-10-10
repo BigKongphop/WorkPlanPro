@@ -11,63 +11,43 @@ class NotificationPage extends StatefulWidget {
 
 class _NotificationPageState extends State<NotificationPage> {
   int _currentIndex = 0;
+  String selectedCategory = 'All';
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Color(0xFF0C5217),
-        title: Text('HOME', style: TextStyle(color: Colors.white)),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        title: Text('Home', style: TextStyle(color: Colors.white)),
       ),
       body: Column(
         children: [
-          Container(
-            padding: EdgeInsets.all(16),
-            color: Color(0xFF0C5217),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Home',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildToggleButton('All', selectedCategory == 'All'),
+                _buildToggleButton('Personal', selectedCategory == 'Personal'),
+                _buildToggleButton('Group', selectedCategory == 'Group'),
+              ],
             ),
           ),
           Expanded(
             child: ListView(
               children: [
-                _buildNotificationItem(
-                  'UKRIT PALANISONG',
-                  'Invited you to join a group',
-                  true,
-                ),
-                _buildNotificationItem(
-                  'UKRIT PALANISONG',
-                  'Topic........................',
-                  false,
-                ),
-                _buildNotificationItem(
-                  'UKRIT PALANISONG',
-                  'Topic........................',
-                  false,
-                ),
-                _buildNotificationItem(
-                  'UKRIT PALANISONG',
-                  'Topic........................',
-                  false,
-                ),
-                _buildNotificationItem(
-                  'UKRIT PALANISONG',
-                  'Topic........................',
-                  false,
-                ),
+                if (selectedCategory == 'All' || selectedCategory == 'Group')
+                  _buildSectionTitle('Activity group'),
+                if (selectedCategory == 'All' || selectedCategory == 'Group')
+                  _buildNotificationItem('UKRIT PALANISONG', 'หัวข้อ.......................'),
+                if (selectedCategory == 'All' || selectedCategory == 'Group')
+                  _buildNotificationItem('UKRIT PALANISONG', 'หัวข้อ.......................'),
+                if (selectedCategory == 'All' || selectedCategory == 'Personal')
+                  _buildSectionTitle('Activity personal'),
+                if (selectedCategory == 'All' || selectedCategory == 'Personal')
+                  _buildNotificationItem('UKRIT PALANISONG', 'หัวข้อ.......................'),
+                if (selectedCategory == 'All' || selectedCategory == 'Personal')
+                  _buildNotificationItem('UKRIT PALANISONG', 'หัวข้อ.......................'),
               ],
             ),
           ),
@@ -130,35 +110,54 @@ class _NotificationPageState extends State<NotificationPage> {
     );
   }
 
-  Widget _buildNavBarItem(IconData icon, String label, int index) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(vertical: 5),
-      decoration: BoxDecoration(
-        color: _currentIndex == index ? Color(0xFF0C5217) : Colors.transparent,
-        borderRadius: BorderRadius.circular(0),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon,
-              color: _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
-          Text(
-            label,
-            style: TextStyle(
-                color:
-                    _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
-          )
-        ],
+  Widget _buildToggleButton(String label, bool isSelected) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            selectedCategory = label; // อัพเดตตัวแปรเมื่อกดปุ่ม
+          });
+        },
+        child: Container(
+          padding: EdgeInsets.symmetric(vertical: 10),
+          margin: EdgeInsets.symmetric(horizontal: 5),
+          decoration: BoxDecoration(
+            color: isSelected ? Color(0xFF0C5217) : Colors.grey[200],
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Color(0xFF0C5217),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildNotificationItem(String name, String content, bool hasActions) {
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Text(
+        title,
+        style: TextStyle(
+          color: Color(0xFF0C5217),
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotificationItem(String name, String content) {
     return Container(
       margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Color(0xFF0C5217),
         borderRadius: BorderRadius.circular(8),
         boxShadow: [
           BoxShadow(
@@ -168,42 +167,32 @@ class _NotificationPageState extends State<NotificationPage> {
           ),
         ],
       ),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: Colors.white,
+          child: Icon(Icons.person, color: Color(0xFF0C5217)),
+        ),
+        title: Text(name, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        subtitle: Text(content, style: TextStyle(color: Colors.white)),
+      ),
+    );
+  }
+
+  Widget _buildNavBarItem(IconData icon, String label, int index) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(vertical: 5),
+      decoration: BoxDecoration(
+        color: _currentIndex == index ? Color(0xFF0C5217) : Colors.transparent,
+      ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Colors.grey[300],
-              child: Icon(Icons.person, color: Colors.grey[600]),
-            ),
-            title: Text(name, style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text(content),
+          Icon(icon, color: _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
+          Text(
+            label,
+            style: TextStyle(color: _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
           ),
-          if (hasActions)
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  ElevatedButton(
-                    onPressed: () {},
-                    child: Text('Decline'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () {},
-                    child: Text('Accept'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF0C5217),
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
         ],
       ),
     );
