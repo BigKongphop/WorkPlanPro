@@ -263,8 +263,7 @@ class _HomePageState extends State<HomePage> {
                       children: List.generate(3, (i) {
                         return Icon(
                           i < note.rating ? Icons.star : Icons.star_border,
-                          color:
-                              i < note.rating ? Color(0xFF0C5217) : Colors.grey,
+                          color: i < note.rating ? Color(0xFF0C5217) : Colors.grey,
                         );
                       }),
                     ),
@@ -279,22 +278,17 @@ class _HomePageState extends State<HomePage> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Color(0xFF0C5217),
                           ),
-                          child: Text('Edit',
-                              style: TextStyle(color: Colors.white)),
+                          child: Text('Edit', style: TextStyle(color: Colors.white)),
                         ),
                         SizedBox(width: 8.0),
                         ElevatedButton(
                           onPressed: () {
-                            setState(() {
-                              notes.removeAt(index);
-                            });
-                            Navigator.pop(context);
+                            _showDeleteConfirmationDialog(context, note, index);
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.red,
                           ),
-                          child: Text('Delete',
-                              style: TextStyle(color: Colors.white)),
+                          child: Text('Delete', style: TextStyle(color: Colors.white)),
                         ),
                       ],
                     ),
@@ -323,27 +317,48 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  void _showDeleteConfirmationDialog(BuildContext context, Note note, int index) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Confirm Delete'),
+          content: Text('Are you sure you want to delete this note?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  notes.removeAt(index);
+                });
+                Navigator.of(context).pop();
+              },
+              child: Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildNavBarItem(IconData icon, String label, int index) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(vertical: 5),
-      decoration: BoxDecoration(
-        color: _currentIndex == index ? Color(0xFF0C5217) : Colors.transparent,
-        borderRadius: BorderRadius.circular(0),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon,
-              color: _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
-          Text(
-            label,
-            style: TextStyle(
-                color:
-                    _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
-          )
-        ],
-      ),
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, color: _currentIndex == index ? Color(0xFF0C5217) : Colors.grey),
+        Text(
+          label,
+          style: TextStyle(
+            color: _currentIndex == index ? Color(0xFF0C5217) : Colors.grey,
+            fontSize: 12.0,
+          ),
+        ),
+      ],
     );
   }
 }

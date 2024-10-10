@@ -115,27 +115,34 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
               children: [
                 ElevatedButton(
                   onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFFD15353),
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
-                  ),
-                  child: Text(
-                    'Delete',
-                    style: TextStyle(color: Colors.white, fontSize: 16.0),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Note newNote = Note(
-                      title: titleController.text,
-                      content: contentController.text,
-                      date: formattedDate,
-                      rating: _rating,
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text('Confirm Save'),
+                        content: Text('Do you want to save this note?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                            },
+                            child: Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Note newNote = Note(
+                                title: titleController.text,
+                                content: contentController.text,
+                                date: formattedDate,
+                                rating: _rating,
+                              );
+                              Navigator.of(context).pop();
+                              Navigator.of(context).pop(newNote);
+                            },
+                            child: Text('Save'),
+                          ),
+                        ],
+                      ),
                     );
-                    Navigator.of(context).pop(newNote);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Color(0xFF40884B),
