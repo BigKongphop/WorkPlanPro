@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For LengthLimitingTextInputFormatter
 import 'package:workplanpro/screens/login_page.dart';
@@ -20,6 +22,8 @@ class _RegisPageState extends State<RegisPage> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final UserDatabase _userDatabase =
       UserDatabase(); // Create UserDatabase instance
+
+  final Future<FirebaseApp> firebase = Firebase.initializeApp();
 
   String? _usernameError;
   String? _emailError;
@@ -74,246 +78,288 @@ class _RegisPageState extends State<RegisPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Center(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Image
-                  Container(
-                    height: 150,
-                    decoration: BoxDecoration(
-                      image: DecorationImage(
-                        image: AssetImage('assets/register_image.png'),
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 30),
-                  // "Create Account" Text
-                  Text(
-                    "Create Account",
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0C5217),
-                    ),
-                  ),
-                  SizedBox(height: 20),
-                  // Username Input
-                  TextFormField(
-                    controller: _usernameController,
-                    decoration: InputDecoration(
-                      labelText: 'Username',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      prefixIcon: Icon(Icons.person, color: Color(0xFF0C5217)),
-                      errorText: _usernameError,
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Color(0xFF0C5217)),
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                    inputFormatters: [
-                      LengthLimitingTextInputFormatter(20),
-                    ],
-                    onChanged: _validateUsername,
-                  ),
-                  SizedBox(height: 20),
-                  // Email Input
-                  TextFormField(
-                    controller: _emailController,
-                    decoration: InputDecoration(
-                      labelText: 'Email',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      prefixIcon: Icon(Icons.email, color: Color(0xFF0C5217)),
-                      errorText: _emailError,
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Color(0xFF0C5217)),
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                    keyboardType: TextInputType.emailAddress,
-                    inputFormatters: [
-                      LengthLimitingTextInputFormatter(50),
-                    ],
-                    onChanged: _validateEmail,
-                  ),
-                  SizedBox(height: 20),
-                  // Password Input
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: !_isPasswordVisible,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      prefixIcon: Icon(Icons.lock, color: Color(0xFF0C5217)),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _isPasswordVisible
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                          color: Color(0xFF0C5217),
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _isPasswordVisible = !_isPasswordVisible;
-                          });
-                        },
-                      ),
-                      errorText: _passwordError,
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Color(0xFF0C5217)),
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                    inputFormatters: [
-                      LengthLimitingTextInputFormatter(20),
-                    ],
-                    onChanged: _validatePassword,
-                  ),
-                  SizedBox(height: 20),
-                  // Confirm Password Input
-                  TextFormField(
-                    controller: _confirmPasswordController,
-                    obscureText: !_isConfirmPasswordVisible,
-                    decoration: InputDecoration(
-                      labelText: 'Confirm Password',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      prefixIcon: Icon(Icons.lock, color: Color(0xFF0C5217)),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _isConfirmPasswordVisible
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                          color: Color(0xFF0C5217),
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _isConfirmPasswordVisible =
-                                !_isConfirmPasswordVisible;
-                          });
-                        },
-                      ),
-                      errorText: _confirmPasswordError,
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Color(0xFF0C5217)),
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                    inputFormatters: [
-                      LengthLimitingTextInputFormatter(20),
-                    ],
-                    onChanged: _validateConfirmPassword,
-                  ),
-                  SizedBox(height: 30),
-                  // Sign Up Button
-                  ElevatedButton(
-                    onPressed: () async {
-                      // Validate all fields again when pressing SIGN UP
-                      _validateUsername(_usernameController.text);
-                      _validateEmail(_emailController.text);
-                      _validatePassword(_passwordController.text);
-                      _validateConfirmPassword(_confirmPasswordController.text);
+    return FutureBuilder(
+      future: firebase,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
 
-                      // Check if all inputs are valid
-                      if (_usernameError == null &&
-                          _emailError == null &&
-                          _passwordError == null &&
-                          _confirmPasswordError == null &&
-                          _formKey.currentState!.validate()) {
-                        // Check if Username and Email already exist
-                        final usernameExists = await _userDatabase
-                            .isUsernameExists(_usernameController.text);
-                        final emailExists = await _userDatabase
-                            .isEmailExists(_emailController.text);
+        if (snapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(
+              title: Text("Error"),
+            ),
+            body: Center(
+              child: Text("Firebase initialization error: ${snapshot.error}"),
+            ),
+          );
+        }
 
-                        if (usernameExists) {
-                          // Show a message that the Username already exists
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Username already exists')),
-                          );
-                        } else if (emailExists) {
-                          // Show a message that the Email already exists
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Email already exists')),
-                          );
-                        } else {
-                          // Register the new user
-                          User newUser = User(
-                            username: _usernameController.text,
-                            email: _emailController.text,
-                            password: _passwordController.text,
-                          );
-                          await _userDatabase.registerUser(newUser);
-                          // Navigate to LoginPage after successful registration
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => LoginPage()),
-                          );
-                        }
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF0C5217),
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 100, vertical: 15),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                    ),
-                    child: Text(
-                      "SIGN UP",
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 20),
-                  // Already have an account? Login now
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text("Already have an account?"),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => LoginPage()),
-                          );
-                        },
-                        child: Text(
-                          "Login now",
-                          style: TextStyle(
-                            color: Color(0xFF0C5217),
-                            fontWeight: FontWeight.bold,
+        if (snapshot.connectionState == ConnectionState.done) {
+          // Initialize the Firebase Firestore instance after Firebase initialization
+          final CollectionReference _userCollection =
+              FirebaseFirestore.instance.collection("user");
+
+          return Scaffold(
+            backgroundColor: Colors.white,
+            body: Center(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Image
+                        Container(
+                          height: 150,
+                          decoration: BoxDecoration(
+                            image: DecorationImage(
+                              image: AssetImage('assets/register_image.png'),
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                        SizedBox(height: 30),
+                        // "Create Account" Text
+                        Text(
+                          "Create Account",
+                          style: TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0C5217),
+                          ),
+                        ),
+                        SizedBox(height: 20),
+                        // Username Input
+                        TextFormField(
+                          controller: _usernameController,
+                          decoration: InputDecoration(
+                            labelText: 'Username',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            prefixIcon:
+                                Icon(Icons.person, color: Color(0xFF0C5217)),
+                            errorText: _usernameError,
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: BorderSide(color: Color(0xFF0C5217)),
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                          ),
+                          inputFormatters: [
+                            LengthLimitingTextInputFormatter(20),
+                          ],
+                          onChanged: _validateUsername,
+                        ),
+                        SizedBox(height: 20),
+                        // Email Input
+                        TextFormField(
+                          controller: _emailController,
+                          decoration: InputDecoration(
+                            labelText: 'Email',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            prefixIcon:
+                                Icon(Icons.email, color: Color(0xFF0C5217)),
+                            errorText: _emailError,
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: BorderSide(color: Color(0xFF0C5217)),
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                          inputFormatters: [
+                            LengthLimitingTextInputFormatter(50),
+                          ],
+                          onChanged: _validateEmail,
+                        ),
+                        SizedBox(height: 20),
+                        // Password Input
+                        TextFormField(
+                          controller: _passwordController,
+                          obscureText: !_isPasswordVisible,
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            prefixIcon:
+                                Icon(Icons.lock, color: Color(0xFF0C5217)),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _isPasswordVisible
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                                color: Color(0xFF0C5217),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _isPasswordVisible = !_isPasswordVisible;
+                                });
+                              },
+                            ),
+                            errorText: _passwordError,
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: BorderSide(color: Color(0xFF0C5217)),
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                          ),
+                          inputFormatters: [
+                            LengthLimitingTextInputFormatter(20),
+                          ],
+                          onChanged: _validatePassword,
+                        ),
+                        SizedBox(height: 20),
+                        // Confirm Password Input
+                        TextFormField(
+                          controller: _confirmPasswordController,
+                          obscureText: !_isConfirmPasswordVisible,
+                          decoration: InputDecoration(
+                            labelText: 'Confirm Password',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            prefixIcon:
+                                Icon(Icons.lock, color: Color(0xFF0C5217)),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _isConfirmPasswordVisible
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                                color: Color(0xFF0C5217),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _isConfirmPasswordVisible =
+                                      !_isConfirmPasswordVisible;
+                                });
+                              },
+                            ),
+                            errorText: _confirmPasswordError,
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: BorderSide(color: Color(0xFF0C5217)),
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                          ),
+                          inputFormatters: [
+                            LengthLimitingTextInputFormatter(20),
+                          ],
+                          onChanged: _validateConfirmPassword,
+                        ),
+                        SizedBox(height: 30),
+                        // Sign Up Button
+                        ElevatedButton(
+                          onPressed: () async {
+                            // Validate all fields again when pressing SIGN UP
+                            _validateUsername(_usernameController.text);
+                            _validateEmail(_emailController.text);
+                            _validatePassword(_passwordController.text);
+                            _validateConfirmPassword(
+                                _confirmPasswordController.text);
+
+                            // Check if all inputs are valid
+                            if (_usernameError == null &&
+                                _emailError == null &&
+                                _passwordError == null &&
+                                _confirmPasswordError == null &&
+                                _formKey.currentState!.validate()) {
+                              // Check if Username and Email already exist
+                              final usernameExists = await _userDatabase
+                                  .isUsernameExists(_usernameController.text);
+                              final emailExists = await _userDatabase
+                                  .isEmailExists(_emailController.text);
+
+                              if (usernameExists) {
+                                // Show a message that the Username already exists
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                      content: Text('Username already exists')),
+                                );
+                              } else if (emailExists) {
+                                // Show a message that the Email already exists
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                      content: Text('Email already exists')),
+                                );
+                              } else {
+                                // Register the new user
+                                await _userCollection.add({
+                                  "username": _usernameController.text,
+                                  "email": _emailController.text,
+                                  "passwrd": _passwordController.text
+                                });
+                                User newUser = User(
+                                  username: _usernameController.text,
+                                  email: _emailController.text,
+                                  password: _passwordController.text,
+                                );
+                                await _userDatabase.registerUser(newUser);
+                                // Navigate to LoginPage after successful registration
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (context) => LoginPage()),
+                                );
+                              }
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFF0C5217),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 100, vertical: 15),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                          ),
+                          child: Text(
+                            "SIGN UP",
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 20),
+                        // Already have an account? Login now
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text("Already have an account?"),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (context) => LoginPage()),
+                                );
+                              },
+                              child: Text(
+                                "Login now",
+                                style: TextStyle(
+                                  color: Color(0xFF0C5217),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
-      ),
+          );
+        }
+
+        return Container();
+      },
     );
   }
 }
