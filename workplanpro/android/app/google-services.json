@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "467408244671",
+    "project_id": "workplanpro-app",
+    "storage_bucket": "workplanpro-app.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:467408244671:android:ca94dadec7f6d96f43db0a",
+        "android_client_info": {
+          "package_name": "com.example.workplanpro"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDR2s8xJCEVhiLmWhtqu-Ixpi1WG09x3E8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
