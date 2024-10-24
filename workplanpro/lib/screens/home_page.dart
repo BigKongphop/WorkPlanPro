@@ -1,152 +1,57 @@
 import 'package:flutter/material.dart';
-import 'create_note_screen.dart';
-import '../models/note.dart';
-import 'notification_page.dart';
+import 'note_page.dart';
+import 'account_page.dart';
 import 'calendar_page.dart';
 import 'group_page.dart';
-import 'account_page.dart';
 
 class HomePage extends StatefulWidget {
   @override
-  _HomePageState createState() => _HomePageState();
+  HomePageState createState() => HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
-  int _currentIndex = 2;
-
-  final List<Note> notes = [];
+class HomePageState extends State<HomePage> {
+  int _currentIndex = 0;
+  String selectedCategory = 'All';
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Color(0xFF0C5217),
-        title: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10.0),
-          child: Container(
-            height: 40.0,
-            child: Opacity(
-              opacity: 0.3,
-              child: TextField(
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.white,
-                  hintText: 'Search...',
-                  prefixIcon: Icon(Icons.search, color: Color(0xFF0C5217)),
-                  contentPadding: EdgeInsets.symmetric(vertical: 10.0),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30.0),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
+        title: Text('Home', style: TextStyle(color: Colors.white)),
       ),
       body: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF0C5217),
-                ),
-                child: Text(
-                  'Important',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF0C5217),
-                ),
-                child: Text(
-                  'Routine',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildToggleButton('All', selectedCategory == 'All'),
+                _buildToggleButton('Personal', selectedCategory == 'Personal'),
+                _buildToggleButton('Group', selectedCategory == 'Group'),
+              ],
+            ),
           ),
           Expanded(
-            child: ListView.builder(
-              itemCount: notes.length,
-              itemBuilder: (context, index) {
-                final note = notes[index];
-                return GestureDetector(
-                  onTap: () {
-                    _showNoteDetail(context, note, index);
-                  },
-                  child: Card(
-                    margin: EdgeInsets.all(8.0),
-                    child: Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(note.date,
-                              style: TextStyle(
-                                  fontSize: 18, fontWeight: FontWeight.bold)),
-                          Text(note.title, style: TextStyle(fontSize: 16)),
-                          SizedBox(height: 8.0),
-                          Row(
-                            children: List.generate(3, (i) {
-                              return Icon(
-                                i < note.rating
-                                    ? Icons.star
-                                    : Icons.star_border,
-                                color: i < note.rating
-                                    ? Color(0xFF0C5217)
-                                    : Colors.grey,
-                              );
-                            }),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
+            child: ListView(
+              children: [
+                if (selectedCategory == 'All' || selectedCategory == 'Group')
+                  _buildSectionTitle('Activity group'),
+                if (selectedCategory == 'All' || selectedCategory == 'Group')
+                  _buildNotificationItem('UKRIT PALANISONG', 'หัวข้อ.......................'),
+                if (selectedCategory == 'All' || selectedCategory == 'Group')
+                  _buildNotificationItem('UKRIT PALANISONG', 'หัวข้อ.......................'),
+                if (selectedCategory == 'All' || selectedCategory == 'Personal')
+                  _buildSectionTitle('Activity personal'),
+                if (selectedCategory == 'All' || selectedCategory == 'Personal')
+                  _buildNotificationItem('UKRIT PALANISONG', 'หัวข้อ.......................'),
+                if (selectedCategory == 'All' || selectedCategory == 'Personal')
+                  _buildNotificationItem('UKRIT PALANISONG', 'หัวข้อ.......................'),
+              ],
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final newNote = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => CreateNoteScreen()),
-          );
-
-          if (newNote != null && newNote is Note) {
-            setState(() {
-              notes.insert(0, newNote);
-            });
-          }
-        },
-        backgroundColor: Color(0xFF0C5217),
-        icon: Icon(Icons.add, color: Colors.white),
-        label: Text(
-          'New Note',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(30.0)),
-        ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
@@ -156,14 +61,14 @@ class _HomePageState extends State<HomePage> {
           });
           switch (index) {
             case 0:
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (context) => NotificationPage()));
               break;
             case 1:
               Navigator.pushReplacement(context,
                   MaterialPageRoute(builder: (context) => AccountPage()));
               break;
             case 2:
+              Navigator.pushReplacement(context,
+                  MaterialPageRoute(builder: (context) => NotePage()));
               break;
             case 3:
               Navigator.pushReplacement(context,
@@ -205,156 +110,71 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _showNoteDetail(BuildContext context, Note note, int index) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
-      ),
-      builder: (BuildContext context) {
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.6,
-          minChildSize: 0.4,
-          maxChildSize: 0.9,
-          builder: (context, scrollController) {
-            return SingleChildScrollView(
-              controller: scrollController,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Notedetail',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 20.0,
-                            color: Color(0xFF0C5217),
-                          ),
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.close, color: Colors.grey),
-                          onPressed: () {
-                            Navigator.pop(context);
-                          },
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 16.0),
-                    Text(
-                      note.title,
-                      style: TextStyle(
-                        fontSize: 18.0,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 8.0),
-                    Text(
-                      note.content,
-                      style: TextStyle(fontSize: 16.0),
-                    ),
-                    SizedBox(height: 16.0),
-                    Row(
-                      children: List.generate(3, (i) {
-                        return Icon(
-                          i < note.rating ? Icons.star : Icons.star_border,
-                          color:
-                              i < note.rating ? Color(0xFF0C5217) : Colors.grey,
-                        );
-                      }),
-                    ),
-                    SizedBox(height: 16.0),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        ElevatedButton(
-                          onPressed: () {
-                            _editNote(context, note, index);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Color(0xFF0C5217),
-                          ),
-                          child: Text('Edit',
-                              style: TextStyle(color: Colors.white)),
-                        ),
-                        SizedBox(width: 8.0),
-                        ElevatedButton(
-                          onPressed: () {
-                            _showDeleteConfirmationDialog(context, note, index);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                          ),
-                          child: Text('Delete',
-                              style: TextStyle(color: Colors.white)),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+  Widget _buildToggleButton(String label, bool isSelected) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            selectedCategory = label; // อัพเดตตัวแปรเมื่อกดปุ่ม
+          });
+        },
+        child: Container(
+          padding: EdgeInsets.symmetric(vertical: 10),
+          margin: EdgeInsets.symmetric(horizontal: 5),
+          decoration: BoxDecoration(
+            color: isSelected ? Color(0xFF0C5217) : Colors.grey[200],
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Color(0xFF0C5217),
+                fontWeight: FontWeight.bold,
               ),
-            );
-          },
-        );
-      },
+            ),
+          ),
+        ),
+      ),
     );
   }
 
-    void _editNote(BuildContext context, Note note, int index) async {
-      final updatedNote = await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CreateNoteScreen(
-            note: note,
-          ),
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Text(
+        title,
+        style: TextStyle(
+          color: Color(0xFF0C5217),
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
         ),
-      );
+      ),
+    );
+  }
 
-      if (updatedNote != null && updatedNote is Note) {
-        setState(() {
-          notes[index] = updatedNote;
-        });
-
-        Navigator.pop(context);
-      }
-    }
-
-
-
-
-  void _showDeleteConfirmationDialog(
-      BuildContext context, Note note, int index) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Confirm Delete'),
-          content: Text('Are you sure you want to delete this note?'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  notes.removeAt(index);
-                });
-                Navigator.of(context).pop();
-                Navigator.of(context).pop();
-              },
-              child: Text('Delete', style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        );
-      },
+  Widget _buildNotificationItem(String name, String content) {
+    return Container(
+      margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Color(0xFF0C5217),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: Colors.white,
+          child: Icon(Icons.person, color: Color(0xFF0C5217)),
+        ),
+        title: Text(name, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        subtitle: Text(content, style: TextStyle(color: Colors.white)),
+      ),
     );
   }
 
@@ -364,19 +184,15 @@ class _HomePageState extends State<HomePage> {
       padding: EdgeInsets.symmetric(vertical: 5),
       decoration: BoxDecoration(
         color: _currentIndex == index ? Color(0xFF0C5217) : Colors.transparent,
-        borderRadius: BorderRadius.circular(0),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon,
-              color: _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
+          Icon(icon, color: _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
           Text(
             label,
-            style: TextStyle(
-                color:
-                    _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
-          )
+            style: TextStyle(color: _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
+          ),
         ],
       ),
     );

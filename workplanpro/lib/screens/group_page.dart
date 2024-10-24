@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'home_page.dart';
+import 'note_page.dart';
 import 'account_page.dart';
 import 'calendar_page.dart';
-import 'notification_page.dart';
+import 'home_page.dart';
 
 class GroupPage extends StatefulWidget {
   @override
@@ -102,7 +102,7 @@ class _GroupPageState extends State<GroupPage> {
           switch (index) {
             case 0:
               Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (context) => NotificationPage()));
+                  MaterialPageRoute(builder: (context) => HomePage()));
               break;
             case 1:
               Navigator.pushReplacement(context,
@@ -110,7 +110,7 @@ class _GroupPageState extends State<GroupPage> {
               break;
             case 2:
               Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (context) => HomePage()));
+                  MaterialPageRoute(builder: (context) => NotePage()));
               break;
             case 3:
               Navigator.pushReplacement(context,

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'note_page.dart';
 import 'home_page.dart';
-import 'notification_page.dart';
 import 'calendar_page.dart';
 import 'group_page.dart';
 import 'login_page.dart';
@@ -150,7 +150,7 @@ class _AccountPageState extends State<AccountPage> {
             case 0:
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => NotificationPage()),
+                MaterialPageRoute(builder: (context) => HomePage()),
               );
               break;
             case 1:
@@ -158,7 +158,7 @@ class _AccountPageState extends State<AccountPage> {
             case 2:
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => HomePage()),
+                MaterialPageRoute(builder: (context) => NotePage()),
               );
               break;
             case 3:

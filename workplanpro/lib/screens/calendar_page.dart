@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'home_page.dart';
+import 'note_page.dart';
 import 'account_page.dart';
 import 'group_page.dart';
-import 'notification_page.dart';
+import 'home_page.dart';
 import 'add_activity_screen.dart';
 import '../models/activity.dart';
 
@@ -391,7 +391,7 @@ class _CalendarPageState extends State<CalendarPage> {
         switch (index) {
           case 0:
             Navigator.pushReplacement(context,
-                MaterialPageRoute(builder: (context) => NotificationPage()));
+                MaterialPageRoute(builder: (context) => HomePage()));
             break;
           case 1:
             Navigator.pushReplacement(context,
@@ -399,7 +399,7 @@ class _CalendarPageState extends State<CalendarPage> {
             break;
           case 2:
             Navigator.pushReplacement(
-                context, MaterialPageRoute(builder: (context) => HomePage()));
+                context, MaterialPageRoute(builder: (context) => NotePage()));
             break;
           case 3:
             break;
