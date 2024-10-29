@@ -1,8 +1,25 @@
+import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:workplanpro/screens/regis_page.dart';
 import 'account_page.dart';
-import '../models/user_database.dart'; // Import UserDatabase
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: LoginPage(),
+    );
+  }
+}
 
 class LoginPage extends StatefulWidget {
   @override
@@ -13,8 +30,18 @@ class _LoginPageState extends State<LoginPage> {
   bool _isPasswordVisible = false;
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final UserDatabase _userDatabase =
-      UserDatabase(); // Create UserDatabase instance
+
+  Future<QuerySnapshot?> getUserData(String username, String password) async {
+    try {
+      return await FirebaseFirestore.instance
+          .collection('user')
+          .where('username', isEqualTo: username)
+          .where('passwrd', isEqualTo: password)
+          .get();
+    } catch (e) {
+      throw e;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +54,6 @@ class _LoginPageState extends State<LoginPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Logo or Image
                 Container(
                   height: 150,
                   decoration: BoxDecoration(
@@ -38,7 +64,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 SizedBox(height: 30),
-                // Welcome Text
                 Text(
                   "Welcome Back",
                   style: TextStyle(
@@ -48,7 +73,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 SizedBox(height: 20),
-                // Username Input
                 TextField(
                   controller: _usernameController,
                   decoration: InputDecoration(
@@ -67,7 +91,6 @@ class _LoginPageState extends State<LoginPage> {
                   ],
                 ),
                 SizedBox(height: 20),
-                // Password Input
                 TextField(
                   controller: _passwordController,
                   obscureText: !_isPasswordVisible,
@@ -100,24 +123,32 @@ class _LoginPageState extends State<LoginPage> {
                   ],
                 ),
                 SizedBox(height: 30),
-                // Login Button
                 ElevatedButton(
                   onPressed: () async {
-                    // ตรวจสอบการเข้าสู่ระบบ
-                    final isValid = await _userDatabase.isValidLogin(
-                      _usernameController.text,
-                      _passwordController.text,
-                    );
-
-                    if (isValid) {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (context) => AccountPage()),
-                      );
-                    } else {
-                      // แสดงข้อความผิดพลาด
+                    try {
+                      final querySnapshot = await getUserData(
+                          _usernameController.text, _passwordController.text);
+                      if (querySnapshot != null &&
+                          querySnapshot.docs.isNotEmpty) {
+                        print(
+                            "Login successful"); // Print login success message
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => AccountPage()),
+                        );
+                      } else {
+                        print(
+                            "Invalid username or password"); // Print invalid username or password
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content: Text('Invalid username or password')),
+                        );
+                      }
+                    } catch (e) {
+                      print("Error: ${e.toString()}"); // Print error message
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Invalid username or password')),
+                        SnackBar(content: Text('Error: ${e.toString()}')),
                       );
                     }
                   },
@@ -135,7 +166,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 SizedBox(height: 20),
-                // Link to Registration Page
                 TextButton(
                   onPressed: () {
                     Navigator.of(context).push(_createRouteToRegisPage());

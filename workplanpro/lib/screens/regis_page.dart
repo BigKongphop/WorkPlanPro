@@ -22,7 +22,6 @@ class _RegisPageState extends State<RegisPage> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final UserDatabase _userDatabase =
       UserDatabase(); // Create UserDatabase instance
-
   final Future<FirebaseApp> firebase = Firebase.initializeApp();
 
   String? _usernameError;
