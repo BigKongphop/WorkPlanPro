@@ -33,12 +33,30 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<QuerySnapshot?> getUserData(String username, String password) async {
     try {
-      return await FirebaseFirestore.instance
+      final querySnapshot = await FirebaseFirestore.instance
           .collection('user')
           .where('username', isEqualTo: username)
-          .where('passwrd', isEqualTo: password)
           .get();
+
+      if (querySnapshot.docs.isNotEmpty) {
+        for (var doc in querySnapshot.docs) {
+          // ตรวจสอบรหัสผ่านที่ดึงมาจาก Firestore
+          String storedPassword = doc[
+              'passwrd']; // เปลี่ยน 'passwrd' ตามชื่อฟิลด์ใน Firestore ของคุณ
+          if (storedPassword == password) {
+            print("Login successful for user: $username");
+            return querySnapshot; // คืนค่า querySnapshot เมื่อรหัสผ่านถูกต้อง
+          } else {
+            print("Invalid password for user: $username");
+            return null; // คืนค่า null หากรหัสผ่านไม่ถูกต้อง
+          }
+        }
+      } else {
+        print("No matching user found with username: $username");
+      }
+      return querySnapshot;
     } catch (e) {
+      print("Error fetching data: ${e.toString()}");
       throw e;
     }
   }
@@ -125,28 +143,27 @@ class _LoginPageState extends State<LoginPage> {
                 SizedBox(height: 30),
                 ElevatedButton(
                   onPressed: () async {
+                    String username =
+                        _usernameController.text.trim().toLowerCase();
+                    String password = _passwordController.text.trim();
+
                     try {
-                      final querySnapshot = await getUserData(
-                          _usernameController.text, _passwordController.text);
-                      if (querySnapshot != null &&
-                          querySnapshot.docs.isNotEmpty) {
-                        print(
-                            "Login successful"); // Print login success message
+                      final querySnapshot =
+                          await getUserData(username, password);
+
+                      if (querySnapshot != null) {
                         Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
                               builder: (context) => AccountPage()),
                         );
                       } else {
-                        print(
-                            "Invalid username or password"); // Print invalid username or password
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                               content: Text('Invalid username or password')),
                         );
                       }
                     } catch (e) {
-                      print("Error: ${e.toString()}"); // Print error message
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('Error: ${e.toString()}')),
                       );
