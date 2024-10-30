@@ -15,7 +15,6 @@ void main() async {
     // You can exit the app or handle the failure as needed
     return; // or use exit(1) if you want to terminate the app
   }
-
   runApp(MyApp());
 }
 

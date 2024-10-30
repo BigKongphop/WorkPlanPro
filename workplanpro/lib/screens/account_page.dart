@@ -1,48 +1,104 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'note_page.dart';
-import 'home_page.dart';
-import 'calendar_page.dart';
-import 'group_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:workplanpro/screens/calendar_page.dart';
+import 'package:workplanpro/screens/group_page.dart';
+import 'package:workplanpro/screens/home_page.dart';
+import 'package:workplanpro/screens/note_page.dart';
 import 'login_page.dart';
-import '../models/user_database.dart'; // Import UserDatabase
-import '../models/personal.dart';
+
+class AccountDetailRow extends StatelessWidget {
+  final String title;
+  final TextEditingController controller;
+  final bool obscureText;
+  final VoidCallback onEdit;
+
+  const AccountDetailRow({
+    Key? key,
+    required this.title,
+    required this.controller,
+    required this.onEdit,
+    this.obscureText = false,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: TextStyle(fontWeight: FontWeight.bold)),
+              SizedBox(height: 5),
+              SizedBox(
+                width: 200,
+                child: TextField(
+                  controller: controller,
+                  obscureText: obscureText,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(),
+                    hintText: 'Enter $title',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          IconButton(
+            icon: Icon(Icons.edit),
+            onPressed: onEdit,
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class AccountPage extends StatefulWidget {
+  const AccountPage({Key? key}) : super(key: key);
+
   @override
   _AccountPageState createState() => _AccountPageState();
 }
 
 class _AccountPageState extends State<AccountPage> {
-  int _currentIndex = 1;
-  User? user;
-  final UserDatabase _userDatabase = UserDatabase();
-  final TextEditingController _usernameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
+  Map<String, dynamic>? userData;
+  bool isLoading = true;
+  int _currentIndex = 1; // กำหนดให้ AccountPage เป็นหน้าเริ่มต้น
 
   @override
   void initState() {
     super.initState();
-    _loadUserData(); // Load user data on init
+    _loadUserData();
   }
 
   Future<void> _loadUserData() async {
-    user = await _userDatabase.fetchUser();
-    if (user != null) {
-      _usernameController.text = user!.username; // Pre-fill the text fields
-      _emailController.text = user!.email;
-    }
-    setState(() {});
-  }
+    try {
+      // ดึงข้อมูล userData จาก arguments ที่ส่งมา
+      await Future.delayed(Duration.zero);
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is Map<String, dynamic>) {
+        // ใช้ username จาก arguments เพื่อดึงข้อมูลล่าสุดจาก Firestore
+        final username = args['username'];
+        final userDoc = await FirebaseFirestore.instance
+            .collection('user')
+            .where('username', isEqualTo: username)
+            .get();
 
-  Future<void> _editUser() async {
-    if (user != null) {
-      final updatedUser = User(
-        username: _usernameController.text,
-        email: _emailController.text,
-        password: user!.password, // Retain the existing password
-      );
-      await _userDatabase.updateUser(updatedUser); // Update user in database
-      _loadUserData(); // Reload user data to reflect changes
+        if (userDoc.docs.isNotEmpty) {
+          setState(() {
+            userData = userDoc.docs.first.data();
+            isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading user data: $e');
+      setState(() {
+        isLoading = false;
+      });
     }
   }
 
@@ -50,232 +106,223 @@ class _AccountPageState extends State<AccountPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Color(0xFF0C5217),
-        foregroundColor: Colors.white,
-        title: Text('ACCOUNT'),
-        centerTitle: false,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () {
-            Navigator.pop(context);
-          },
+        title: const Text(
+          'Account',
+          style: TextStyle(color: Colors.white),
         ),
-      ),
-      body: Container(
-        color: Color(0xFFEFEFEF),
-        child: user == null
-            ? Center(
-                child: CircularProgressIndicator()) // Show loading indicator
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  SizedBox(height: 20),
-                  Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundColor: Color(0xFF0C5217),
-                        child: CircleAvatar(
-                          radius: 48,
-                          backgroundColor: Colors.white,
-                          child: CircleAvatar(
-                            radius: 45,
-                            backgroundImage:
-                                AssetImage('assets/profile_placeholder.png'),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 10,
-                        child: CircleAvatar(
-                          radius: 8,
-                          backgroundColor: Colors.greenAccent,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 10),
-                  Text(
-                    user!.username,
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 20),
-                  AccountDetailRow(
-                    title: 'Username',
-                    detail: user!.username,
-                    controller: _usernameController,
-                    onEdit: _editUser,
-                  ),
-                  AccountDetailRow(
-                    title: 'Email',
-                    detail: user!.email,
-                    controller: _emailController,
-                    onEdit: _editUser,
-                  ),
-                  AccountDetailRow(
-                    title: 'Phone number',
-                    detail: '06-2589-6377', // Static for now
-                    controller: TextEditingController(),
-                    onEdit: () {}, // No edit functionality for phone
-                  ),
-                  SizedBox(height: 30),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (context) => LoginPage()),
-                      );
-                    },
-                    child: Text('Log out'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF5A5A5A),
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 100, vertical: 15),
-                      textStyle: TextStyle(fontSize: 18),
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-          switch (index) {
-            case 0:
+        backgroundColor: const Color(0xFF0C5217),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.exit_to_app, color: Colors.white),
+            onPressed: () {
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(builder: (context) => HomePage()),
+                MaterialPageRoute(builder: (context) => const LoginPage()),
               );
-              break;
-            case 1:
-              break;
-            case 2:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => NotePage()),
-              );
-              break;
-            case 3:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => CalendarPage()),
-              );
-              break;
-            case 4:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => GroupPage()),
-              );
-              break;
-          }
-        },
-        selectedItemColor: Colors.white,
-        unselectedItemColor: Color(0xFF0C5217),
-        backgroundColor: Colors.white,
-        type: BottomNavigationBarType.fixed,
-        items: [
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.home, 'Home', 0),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.person, 'Account', 1),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.book, 'Note', 2),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.calendar_today, 'Calendar', 3),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.group, 'Group', 4),
-            label: '',
+            },
           ),
         ],
       ),
+      body: isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF0C5217)),
+            )
+          : SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 20),
+                    // Profile Image
+                    Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFF0C5217),
+                          width: 3,
+                        ),
+                      ),
+                      child: const CircleAvatar(
+                        backgroundColor: Color(0xFF0C5217),
+                        child: Icon(
+                          Icons.person,
+                          size: 80,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // User Information
+                    if (userData != null) ...[
+                      _buildInfoCard(
+                        'ชื่อผู้ใช้',
+                        userData!['username'] ?? 'N/A',
+                        Icons.person,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildInfoCard(
+                        'อีเมล',
+                        userData!['email'] ?? 'N/A',
+                        Icons.email,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildInfoCard(
+                        'เบอร์โทรศัพท์',
+                        userData!['phone'] ?? 'N/A',
+                        Icons.phone,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildInfoCard(
+                        'ที่อยู่',
+                        userData!['address'] ?? 'N/A',
+                        Icons.location_on,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return BottomNavigationBar(
+      currentIndex: _currentIndex,
+      onTap: (index) {
+        setState(() {
+          _currentIndex = index;
+        });
+        switch (index) {
+          case 0:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => HomePage()),
+            );
+            break;
+          case 1:
+            // ไม่ต้องทำอะไร เพราะอยู่ในหน้า AccountPage
+            break;
+          case 2:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => NotePage()),
+            );
+            break;
+          case 3:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => CalendarPage()),
+            );
+            break;
+          case 4:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => GroupPage()),
+            );
+            break;
+        }
+      },
+      selectedItemColor: Colors.white,
+      unselectedItemColor: const Color(0xFF0C5217),
+      backgroundColor: Colors.white,
+      type: BottomNavigationBarType.fixed,
+      items: [
+        BottomNavigationBarItem(
+          icon: _buildNavBarItem(Icons.home, 'Home', 0),
+          label: '',
+        ),
+        BottomNavigationBarItem(
+          icon: _buildNavBarItem(Icons.person, 'Account', 1),
+          label: '',
+        ),
+        BottomNavigationBarItem(
+          icon: _buildNavBarItem(Icons.book, 'Note', 2),
+          label: '',
+        ),
+        BottomNavigationBarItem(
+          icon: _buildNavBarItem(Icons.calendar_today, 'Calendar', 3),
+          label: '',
+        ),
+        BottomNavigationBarItem(
+          icon: _buildNavBarItem(Icons.group, 'Group', 4),
+          label: '',
+        ),
+      ],
     );
   }
 
   Widget _buildNavBarItem(IconData icon, String label, int index) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.symmetric(vertical: 5),
+      padding: const EdgeInsets.symmetric(vertical: 5),
       decoration: BoxDecoration(
-        color: _currentIndex == index ? Color(0xFF0C5217) : Colors.transparent,
+        color: _currentIndex == index
+            ? const Color(0xFF0C5217)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(0),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon,
-              color: _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
+          Icon(
+            icon,
+            color:
+                _currentIndex == index ? Colors.white : const Color(0xFF0C5217),
+          ),
           Text(
             label,
             style: TextStyle(
-                color:
-                    _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
-          )
+              color: _currentIndex == index
+                  ? Colors.white
+                  : const Color(0xFF0C5217),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class AccountDetailRow extends StatelessWidget {
-  final String title;
-  final String detail;
-  final TextEditingController controller;
-  final VoidCallback onEdit;
-
-  AccountDetailRow({
-    required this.title,
-    required this.detail,
-    required this.controller,
-    required this.onEdit,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+Widget _buildInfoCard(String label, String value, IconData icon) {
+  return Card(
+    elevation: 2,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(16.0),
       child: Row(
         children: [
+          Icon(icon, color: const Color(0xFF0C5217), size: 28),
+          const SizedBox(width: 16),
           Expanded(
-            flex: 3,
-            child: Text(
-              title,
-              style: TextStyle(fontSize: 16),
-            ),
-          ),
-          Expanded(
-            flex: 5,
-            child: TextField(
-              controller: controller,
-              readOnly: detail == 'Phone number', // Make phone read-only
-              decoration: InputDecoration(
-                hintText: detail,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: onEdit,
-            child: Text('Edit'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF5A5A5A),
-              foregroundColor: Colors.white,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
 }

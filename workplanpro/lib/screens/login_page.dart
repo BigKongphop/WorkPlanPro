@@ -1,27 +1,14 @@
 import 'dart:async';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:workplanpro/screens/account_page.dart';
 import 'package:workplanpro/screens/regis_page.dart';
-import 'account_page.dart';
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  runApp(MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      home: LoginPage(),
-    );
-  }
-}
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class LoginPage extends StatefulWidget {
+  const LoginPage({Key? key}) : super(key: key);
+
   @override
   _LoginPageState createState() => _LoginPageState();
 }
@@ -30,35 +17,147 @@ class _LoginPageState extends State<LoginPage> {
   bool _isPasswordVisible = false;
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  bool _isLoading = false;
 
-  Future<QuerySnapshot?> getUserData(String username, String password) async {
+  Future<bool> _checkInternetConnection() async {
+    var connectivityResult = await Connectivity().checkConnectivity();
+    return connectivityResult != ConnectivityResult.none;
+  }
+
+  Future<Map<String, dynamic>?> validateUserCredentials(
+      String username, String password) async {
     try {
+      print('Starting Firestore query for user: $username');
+
+      // Increase timeout to 30 seconds
       final querySnapshot = await FirebaseFirestore.instance
           .collection('user')
           .where('username', isEqualTo: username)
-          .get();
+          .where('passwrd', isEqualTo: password)
+          .get()
+          .timeout(
+        const Duration(seconds: 30), // Increase timeout duration
+        onTimeout: () {
+          print('Firestore query timeout');
+          throw TimeoutException(
+              'Connection failed, please check your internet connection');
+        },
+      );
+
+      print('Query completed successfully');
+      print('Documents found: ${querySnapshot.docs.length}');
 
       if (querySnapshot.docs.isNotEmpty) {
-        for (var doc in querySnapshot.docs) {
-          // ตรวจสอบรหัสผ่านที่ดึงมาจาก Firestore
-          String storedPassword = doc[
-              'passwrd']; // เปลี่ยน 'passwrd' ตามชื่อฟิลด์ใน Firestore ของคุณ
-          if (storedPassword == password) {
-            print("Login successful for user: $username");
-            return querySnapshot; // คืนค่า querySnapshot เมื่อรหัสผ่านถูกต้อง
-          } else {
-            print("Invalid password for user: $username");
-            return null; // คืนค่า null หากรหัสผ่านไม่ถูกต้อง
-          }
-        }
-      } else {
-        print("No matching user found with username: $username");
+        final userData = querySnapshot.docs.first.data();
+        print('User data retrieved successfully: ${userData['username']}');
+        return userData;
       }
-      return querySnapshot;
+
+      print('No matching user found');
+      return null;
+    } on TimeoutException catch (e) {
+      print('Timeout error: $e');
+      throw TimeoutException('Connection failed, please try again');
+    } on FirebaseException catch (e) {
+      print('Firebase error: $e');
+      throw Exception('Connection error: ${e.message}');
     } catch (e) {
-      print("Error fetching data: ${e.toString()}");
-      throw e;
+      print('Other error: $e');
+      throw Exception('An error occurred: $e');
     }
+  }
+
+  Future<void> _handleLogin() async {
+    // Check internet connection first
+    bool hasInternet = await _checkInternetConnection();
+    if (!hasInternet) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please check your internet connection'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter Username and Password'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final username = _usernameController.text.trim().toLowerCase();
+      final password = _passwordController.text.trim();
+
+      print('Attempting login for user: $username');
+
+      final userData = await validateUserCredentials(username, password);
+
+      if (userData != null) {
+        if (!mounted) return;
+
+        print('Login successful, navigating to AccountPage');
+        await Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AccountPage(),
+            settings: RouteSettings(arguments: userData),
+          ),
+        );
+      } else {
+        throw Exception('Username or Password is incorrect');
+      }
+    } on TimeoutException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message ?? 'Connection failed, please try again'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Widget _buildLoginButton() {
+    return _isLoading
+        ? const CircularProgressIndicator(color: Color(0xFF0C5217))
+        : ElevatedButton(
+            onPressed: _handleLogin,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0C5217),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 100, vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
+            child: const Text(
+              'LOGIN',
+              style: TextStyle(fontSize: 18, color: Colors.white),
+            ),
+          );
   }
 
   @override
@@ -74,15 +173,15 @@ class _LoginPageState extends State<LoginPage> {
               children: [
                 Container(
                   height: 150,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     image: DecorationImage(
                       image: AssetImage('assets/login_image.png'),
                       fit: BoxFit.contain,
                     ),
                   ),
                 ),
-                SizedBox(height: 30),
-                Text(
+                const SizedBox(height: 30),
+                const Text(
                   "Welcome Back",
                   style: TextStyle(
                     fontSize: 30,
@@ -90,7 +189,7 @@ class _LoginPageState extends State<LoginPage> {
                     color: Color(0xFF0C5217),
                   ),
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
                 TextField(
                   controller: _usernameController,
                   decoration: InputDecoration(
@@ -98,9 +197,10 @@ class _LoginPageState extends State<LoginPage> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(30),
                     ),
-                    prefixIcon: Icon(Icons.person, color: Color(0xFF0C5217)),
+                    prefixIcon:
+                        const Icon(Icons.person, color: Color(0xFF0C5217)),
                     focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Color(0xFF0C5217)),
+                      borderSide: const BorderSide(color: Color(0xFF0C5217)),
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
@@ -108,7 +208,7 @@ class _LoginPageState extends State<LoginPage> {
                     LengthLimitingTextInputFormatter(20),
                   ],
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
                 TextField(
                   controller: _passwordController,
                   obscureText: !_isPasswordVisible,
@@ -117,13 +217,14 @@ class _LoginPageState extends State<LoginPage> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(30),
                     ),
-                    prefixIcon: Icon(Icons.lock, color: Color(0xFF0C5217)),
+                    prefixIcon:
+                        const Icon(Icons.lock, color: Color(0xFF0C5217)),
                     suffixIcon: IconButton(
                       icon: Icon(
                         _isPasswordVisible
                             ? Icons.visibility
                             : Icons.visibility_off,
-                        color: Color(0xFF0C5217),
+                        color: const Color(0xFF0C5217),
                       ),
                       onPressed: () {
                         setState(() {
@@ -132,7 +233,7 @@ class _LoginPageState extends State<LoginPage> {
                       },
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Color(0xFF0C5217)),
+                      borderSide: const BorderSide(color: Color(0xFF0C5217)),
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
@@ -140,54 +241,14 @@ class _LoginPageState extends State<LoginPage> {
                     LengthLimitingTextInputFormatter(20),
                   ],
                 ),
-                SizedBox(height: 30),
-                ElevatedButton(
-                  onPressed: () async {
-                    String username =
-                        _usernameController.text.trim().toLowerCase();
-                    String password = _passwordController.text.trim();
-
-                    try {
-                      final querySnapshot =
-                          await getUserData(username, password);
-
-                      if (querySnapshot != null) {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => AccountPage()),
-                        );
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content: Text('Invalid username or password')),
-                        );
-                      }
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error: ${e.toString()}')),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF0C5217),
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 100, vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
-                  child: Text(
-                    'LOGIN',
-                    style: TextStyle(fontSize: 18, color: Colors.white),
-                  ),
-                ),
-                SizedBox(height: 20),
+                const SizedBox(height: 30),
+                _buildLoginButton(),
+                const SizedBox(height: 20),
                 TextButton(
                   onPressed: () {
                     Navigator.of(context).push(_createRouteToRegisPage());
                   },
-                  child: Text(
+                  child: const Text(
                     "Don't have an account? Sign up",
                     style: TextStyle(color: Color(0xFF0C5217)),
                   ),
@@ -200,21 +261,28 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Route _createRouteToRegisPage() {
-    return PageRouteBuilder(
-      pageBuilder: (context, animation, secondaryAnimation) => RegisPage(),
-      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        var begin = Offset(1.0, 0.0);
-        var end = Offset.zero;
-        var curve = Curves.easeInOut;
-        var tween =
-            Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-        var offsetAnimation = animation.drive(tween);
-        return SlideTransition(
-          position: offsetAnimation,
-          child: child,
-        );
-      },
-    );
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
+}
+
+Route _createRouteToRegisPage() {
+  return PageRouteBuilder(
+    pageBuilder: (context, animation, secondaryAnimation) =>
+        RegisPage(), // Removed const
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      const begin = Offset(1.0, 0.0);
+      const end = Offset.zero;
+      const curve = Curves.easeInOut;
+      var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+      var offsetAnimation = animation.drive(tween);
+      return SlideTransition(
+        position: offsetAnimation,
+        child: child,
+      );
+    },
+  );
 }
