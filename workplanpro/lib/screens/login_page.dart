@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:workplanpro/screens/account_page.dart';
 import 'package:workplanpro/screens/regis_page.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({Key? key}) : super(key: key);
@@ -29,46 +30,42 @@ class _LoginPageState extends State<LoginPage> {
     try {
       print('Starting Firestore query for user: $username');
 
-      // Increase timeout to 30 seconds
       final querySnapshot = await FirebaseFirestore.instance
           .collection('user')
           .where('username', isEqualTo: username)
           .where('passwrd', isEqualTo: password)
           .get()
           .timeout(
-        const Duration(seconds: 30), // Increase timeout duration
+        const Duration(seconds: 30),
         onTimeout: () {
-          print('Firestore query timeout');
           throw TimeoutException(
               'Connection failed, please check your internet connection');
         },
       );
 
-      print('Query completed successfully');
-      print('Documents found: ${querySnapshot.docs.length}');
-
       if (querySnapshot.docs.isNotEmpty) {
-        final userData = querySnapshot.docs.first.data();
-        print('User data retrieved successfully: ${userData['username']}');
-        return userData;
+        return querySnapshot.docs.first.data();
       }
-
-      print('No matching user found');
       return null;
-    } on TimeoutException catch (e) {
-      print('Timeout error: $e');
-      throw TimeoutException('Connection failed, please try again');
-    } on FirebaseException catch (e) {
-      print('Firebase error: $e');
-      throw Exception('Connection error: ${e.message}');
     } catch (e) {
-      print('Other error: $e');
-      throw Exception('An error occurred: $e');
+      print('Error in validateUserCredentials: $e');
+      rethrow;
     }
   }
 
+  Future<void> _saveUserData(Map<String, dynamic> userData) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('username', userData['username']);
+    await prefs.setString('email', userData['email']);
+    await prefs.setString('phone', userData['phone'] ?? 'N/A');
+    await prefs.setString('address', userData['address'] ?? 'N/A');
+  }
+
   Future<void> _handleLogin() async {
-    // Check internet connection first
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).clearSnackBars();
+
     bool hasInternet = await _checkInternetConnection();
     if (!hasInternet) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -97,35 +94,31 @@ class _LoginPageState extends State<LoginPage> {
       final username = _usernameController.text.trim().toLowerCase();
       final password = _passwordController.text.trim();
 
-      print('Attempting login for user: $username');
-
       final userData = await validateUserCredentials(username, password);
 
       if (userData != null) {
         if (!mounted) return;
 
-        print('Login successful, navigating to AccountPage');
+        final completeUserData = {
+          ...userData,
+          'username': username,
+        };
+
+        await _saveUserData(completeUserData);
+
         await Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => AccountPage(),
-            settings: RouteSettings(arguments: userData),
+            builder: (context) => const AccountPage(),
+            settings: RouteSettings(arguments: completeUserData),
           ),
         );
       } else {
         throw Exception('Username or Password is incorrect');
       }
-    } on TimeoutException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.message ?? 'Connection failed, please try again'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-        ),
-      );
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.toString()),
@@ -138,26 +131,6 @@ class _LoginPageState extends State<LoginPage> {
         setState(() => _isLoading = false);
       }
     }
-  }
-
-  Widget _buildLoginButton() {
-    return _isLoading
-        ? const CircularProgressIndicator(color: Color(0xFF0C5217))
-        : ElevatedButton(
-            onPressed: _handleLogin,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0C5217),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 100, vertical: 15),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
-              ),
-            ),
-            child: const Text(
-              'LOGIN',
-              style: TextStyle(fontSize: 18, color: Colors.white),
-            ),
-          );
   }
 
   @override
@@ -242,7 +215,23 @@ class _LoginPageState extends State<LoginPage> {
                   ],
                 ),
                 const SizedBox(height: 30),
-                _buildLoginButton(),
+                _isLoading
+                    ? const CircularProgressIndicator(color: Color(0xFF0C5217))
+                    : ElevatedButton(
+                        onPressed: _handleLogin,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0C5217),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 100, vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
+                        child: const Text(
+                          'LOGIN',
+                          style: TextStyle(fontSize: 18, color: Colors.white),
+                        ),
+                      ),
                 const SizedBox(height: 20),
                 TextButton(
                   onPressed: () {
@@ -271,8 +260,7 @@ class _LoginPageState extends State<LoginPage> {
 
 Route _createRouteToRegisPage() {
   return PageRouteBuilder(
-    pageBuilder: (context, animation, secondaryAnimation) =>
-        RegisPage(), // Removed const
+    pageBuilder: (context, animation, secondaryAnimation) => RegisPage(),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       const begin = Offset(1.0, 0.0);
       const end = Offset.zero;

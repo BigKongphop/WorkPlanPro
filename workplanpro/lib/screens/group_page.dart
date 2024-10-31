@@ -73,7 +73,6 @@ class _GroupPageState extends State<GroupPage> {
         padding: const EdgeInsets.only(bottom: 10.0),
         child: ElevatedButton.icon(
           onPressed: () {
-            // Action for creating a new group
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: Color(0xFF0C5217),
@@ -101,16 +100,16 @@ class _GroupPageState extends State<GroupPage> {
           });
           switch (index) {
             case 0:
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (context) => HomePage()));
+              Navigator.pushReplacement(
+                  context, MaterialPageRoute(builder: (context) => HomePage()));
               break;
             case 1:
               Navigator.pushReplacement(context,
                   MaterialPageRoute(builder: (context) => AccountPage()));
               break;
             case 2:
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (context) => NotePage()));
+              Navigator.pushReplacement(
+                  context, MaterialPageRoute(builder: (context) => NotePage()));
               break;
             case 3:
               Navigator.pushReplacement(context,
@@ -170,6 +169,19 @@ class _GroupPageState extends State<GroupPage> {
                     _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
           )
         ],
+      ),
+    );
+  }
+
+  void _navigateToPage(
+      BuildContext context, Widget page, Map<String, dynamic>? userData) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => page,
+        settings: RouteSettings(
+          arguments: userData,
+        ),
       ),
     );
   }

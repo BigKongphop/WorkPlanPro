@@ -390,8 +390,8 @@ class _CalendarPageState extends State<CalendarPage> {
         });
         switch (index) {
           case 0:
-            Navigator.pushReplacement(context,
-                MaterialPageRoute(builder: (context) => HomePage()));
+            Navigator.pushReplacement(
+                context, MaterialPageRoute(builder: (context) => HomePage()));
             break;
           case 1:
             Navigator.pushReplacement(context,
@@ -458,6 +458,19 @@ class _CalendarPageState extends State<CalendarPage> {
                     _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
           )
         ],
+      ),
+    );
+  }
+
+  void _navigateToPage(
+      BuildContext context, Widget page, Map<String, dynamic>? userData) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => page,
+        settings: RouteSettings(
+          arguments: userData,
+        ),
       ),
     );
   }

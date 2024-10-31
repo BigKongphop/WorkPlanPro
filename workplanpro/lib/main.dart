@@ -12,8 +12,7 @@ void main() async {
     await Firebase.initializeApp();
   } catch (e) {
     Logger().e("Failed to initialize Firebase: $e");
-    // You can exit the app or handle the failure as needed
-    return; // or use exit(1) if you want to terminate the app
+    return;
   }
   runApp(MyApp());
 }

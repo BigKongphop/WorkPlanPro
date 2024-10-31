@@ -156,8 +156,8 @@ class _NotePageState extends State<NotePage> {
           });
           switch (index) {
             case 0:
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (context) => HomePage()));
+              Navigator.pushReplacement(
+                  context, MaterialPageRoute(builder: (context) => HomePage()));
               break;
             case 1:
               Navigator.pushReplacement(context,
@@ -305,27 +305,24 @@ class _NotePageState extends State<NotePage> {
     );
   }
 
-    void _editNote(BuildContext context, Note note, int index) async {
-      final updatedNote = await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CreateNoteScreen(
-            note: note,
-          ),
+  void _editNote(BuildContext context, Note note, int index) async {
+    final updatedNote = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreateNoteScreen(
+          note: note,
         ),
-      );
+      ),
+    );
 
-      if (updatedNote != null && updatedNote is Note) {
-        setState(() {
-          notes[index] = updatedNote;
-        });
+    if (updatedNote != null && updatedNote is Note) {
+      setState(() {
+        notes[index] = updatedNote;
+      });
 
-        Navigator.pop(context);
-      }
+      Navigator.pop(context);
     }
-
-
-
+  }
 
   void _showDeleteConfirmationDialog(
       BuildContext context, Note note, int index) {
@@ -378,6 +375,19 @@ class _NotePageState extends State<NotePage> {
                     _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
           )
         ],
+      ),
+    );
+  }
+
+  void _navigateToPage(
+      BuildContext context, Widget page, Map<String, dynamic>? userData) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => page,
+        settings: RouteSettings(
+          arguments: userData,
+        ),
       ),
     );
   }

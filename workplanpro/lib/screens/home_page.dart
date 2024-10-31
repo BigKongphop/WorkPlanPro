@@ -39,15 +39,19 @@ class HomePageState extends State<HomePage> {
                 if (selectedCategory == 'All' || selectedCategory == 'Group')
                   _buildSectionTitle('Activity group'),
                 if (selectedCategory == 'All' || selectedCategory == 'Group')
-                  _buildNotificationItem('UKRIT PALANISONG', 'หัวข้อ.......................'),
+                  _buildNotificationItem(
+                      'UKRIT PALANISONG', 'หัวข้อ.......................'),
                 if (selectedCategory == 'All' || selectedCategory == 'Group')
-                  _buildNotificationItem('UKRIT PALANISONG', 'หัวข้อ.......................'),
+                  _buildNotificationItem(
+                      'UKRIT PALANISONG', 'หัวข้อ.......................'),
                 if (selectedCategory == 'All' || selectedCategory == 'Personal')
                   _buildSectionTitle('Activity personal'),
                 if (selectedCategory == 'All' || selectedCategory == 'Personal')
-                  _buildNotificationItem('UKRIT PALANISONG', 'หัวข้อ.......................'),
+                  _buildNotificationItem(
+                      'UKRIT PALANISONG', 'หัวข้อ.......................'),
                 if (selectedCategory == 'All' || selectedCategory == 'Personal')
-                  _buildNotificationItem('UKRIT PALANISONG', 'หัวข้อ.......................'),
+                  _buildNotificationItem(
+                      'UKRIT PALANISONG', 'หัวข้อ.......................'),
               ],
             ),
           ),
@@ -67,8 +71,8 @@ class HomePageState extends State<HomePage> {
                   MaterialPageRoute(builder: (context) => AccountPage()));
               break;
             case 2:
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (context) => NotePage()));
+              Navigator.pushReplacement(
+                  context, MaterialPageRoute(builder: (context) => NotePage()));
               break;
             case 3:
               Navigator.pushReplacement(context,
@@ -115,7 +119,7 @@ class HomePageState extends State<HomePage> {
       child: GestureDetector(
         onTap: () {
           setState(() {
-            selectedCategory = label; // อัพเดตตัวแปรเมื่อกดปุ่ม
+            selectedCategory = label;
           });
         },
         child: Container(
@@ -172,7 +176,8 @@ class HomePageState extends State<HomePage> {
           backgroundColor: Colors.white,
           child: Icon(Icons.person, color: Color(0xFF0C5217)),
         ),
-        title: Text(name, style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        title: Text(name,
+            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
         subtitle: Text(content, style: TextStyle(color: Colors.white)),
       ),
     );
@@ -188,12 +193,28 @@ class HomePageState extends State<HomePage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
+          Icon(icon,
+              color: _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
           Text(
             label,
-            style: TextStyle(color: _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
+            style: TextStyle(
+                color:
+                    _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
           ),
         ],
+      ),
+    );
+  }
+
+  void _navigateToPage(
+      BuildContext context, Widget page, Map<String, dynamic>? userData) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => page,
+        settings: RouteSettings(
+          arguments: userData,
+        ),
       ),
     );
   }

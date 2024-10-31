@@ -1,9 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // For LengthLimitingTextInputFormatter
+import 'package:flutter/services.dart';
 import 'package:workplanpro/screens/login_page.dart';
-import '../models/user_database.dart'; // Import UserDatabase
+import '../models/user_database.dart';
 import '../models/personal.dart';
 
 class RegisPage extends StatefulWidget {
