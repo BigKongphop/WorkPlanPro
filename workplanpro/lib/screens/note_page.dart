@@ -5,6 +5,8 @@ import 'home_page.dart';
 import 'calendar_page.dart';
 import 'group_page.dart';
 import 'account_page.dart';
+import '../services/note_database.dart';
+
 
 class NotePage extends StatefulWidget {
   @override
@@ -13,8 +15,34 @@ class NotePage extends StatefulWidget {
 
 class _NotePageState extends State<NotePage> {
   int _currentIndex = 2;
+  final NoteDatabase _noteDatabase = NoteDatabase();
+  List<Note> notes = [];
+  bool _isLoading = true;
 
-  final List<Note> notes = [];
+  @override
+  void initState() {
+    super.initState();
+    _loadNotes();
+  }
+
+  Future<void> _loadNotes() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final loadedNotes = await _noteDatabase.loadNotes();
+      setState(() {
+        notes = loadedNotes;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading notes: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,45 +108,47 @@ class _NotePageState extends State<NotePage> {
             ],
           ),
           Expanded(
-            child: ListView.builder(
-              itemCount: notes.length,
-              itemBuilder: (context, index) {
-                final note = notes[index];
-                return GestureDetector(
-                  onTap: () {
-                    _showNoteDetail(context, note, index);
-                  },
-                  child: Card(
-                    margin: EdgeInsets.all(8.0),
-                    child: Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(note.date,
-                              style: TextStyle(
-                                  fontSize: 18, fontWeight: FontWeight.bold)),
-                          Text(note.title, style: TextStyle(fontSize: 16)),
-                          SizedBox(height: 8.0),
-                          Row(
-                            children: List.generate(3, (i) {
-                              return Icon(
-                                i < note.rating
-                                    ? Icons.star
-                                    : Icons.star_border,
-                                color: i < note.rating
-                                    ? Color(0xFF0C5217)
-                                    : Colors.grey,
-                              );
-                            }),
+            child: _isLoading
+              ? Center(child: CircularProgressIndicator(color: Color(0xFF0C5217)))
+              : ListView.builder(
+                  itemCount: notes.length,
+                  itemBuilder: (context, index) {
+                    final note = notes[index];
+                    return GestureDetector(
+                      onTap: () {
+                        _showNoteDetail(context, note, index);
+                      },
+                      child: Card(
+                        margin: EdgeInsets.all(8.0),
+                        child: Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(note.date,
+                                  style: TextStyle(
+                                      fontSize: 18, fontWeight: FontWeight.bold)),
+                              Text(note.title, style: TextStyle(fontSize: 16)),
+                              SizedBox(height: 8.0),
+                              Row(
+                                children: List.generate(3, (i) {
+                                  return Icon(
+                                    i < note.rating
+                                        ? Icons.star
+                                        : Icons.star_border,
+                                    color: i < note.rating
+                                        ? Color(0xFF0C5217)
+                                        : Colors.grey,
+                                  );
+                                }),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-                );
-              },
-            ),
+                    );
+                  },
+                ),
           ),
         ],
       ),
@@ -133,6 +163,7 @@ class _NotePageState extends State<NotePage> {
             setState(() {
               notes.insert(0, newNote);
             });
+            await _noteDatabase.saveNotes(notes);
           }
         },
         backgroundColor: Color(0xFF0C5217),
@@ -230,7 +261,7 @@ class _NotePageState extends State<NotePage> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Notedetail',
+                          'Note Detail',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 20.0,
@@ -273,8 +304,23 @@ class _NotePageState extends State<NotePage> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         ElevatedButton(
-                          onPressed: () {
-                            _editNote(context, note, index);
+                          onPressed: () async {
+                            Navigator.pop(context);
+                            final updatedNote = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => CreateNoteScreen(
+                                  note: note,
+                                ),
+                              ),
+                            );
+
+                            if (updatedNote != null && updatedNote is Note) {
+                              setState(() {
+                                notes[index] = updatedNote;
+                              });
+                              await _noteDatabase.saveNotes(notes);
+                            }
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Color(0xFF0C5217),
@@ -305,25 +351,6 @@ class _NotePageState extends State<NotePage> {
     );
   }
 
-  void _editNote(BuildContext context, Note note, int index) async {
-    final updatedNote = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CreateNoteScreen(
-          note: note,
-        ),
-      ),
-    );
-
-    if (updatedNote != null && updatedNote is Note) {
-      setState(() {
-        notes[index] = updatedNote;
-      });
-
-      Navigator.pop(context);
-    }
-  }
-
   void _showDeleteConfirmationDialog(
       BuildContext context, Note note, int index) {
     showDialog(
@@ -340,10 +367,11 @@ class _NotePageState extends State<NotePage> {
               child: Text('Cancel'),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 setState(() {
                   notes.removeAt(index);
                 });
+                await _noteDatabase.saveNotes(notes);
                 Navigator.of(context).pop();
                 Navigator.of(context).pop();
               },
@@ -375,19 +403,6 @@ class _NotePageState extends State<NotePage> {
                     _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
           )
         ],
-      ),
-    );
-  }
-
-  void _navigateToPage(
-      BuildContext context, Widget page, Map<String, dynamic>? userData) {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => page,
-        settings: RouteSettings(
-          arguments: userData,
-        ),
       ),
     );
   }
