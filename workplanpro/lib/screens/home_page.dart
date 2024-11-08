@@ -5,6 +5,10 @@ import 'calendar_page.dart';
 import 'group_page.dart';
 
 class HomePage extends StatefulWidget {
+  final String username;
+
+  const HomePage({Key? key, required this.username}) : super(key: key);
+
   @override
   HomePageState createState() => HomePageState();
 }
@@ -57,60 +61,7 @@ class HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-          switch (index) {
-            case 0:
-              break;
-            case 1:
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (context) => AccountPage()));
-              break;
-            case 2:
-              Navigator.pushReplacement(
-                  context, MaterialPageRoute(builder: (context) => NotePage()));
-              break;
-            case 3:
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (context) => CalendarPage()));
-              break;
-            case 4:
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (context) => GroupPage()));
-              break;
-          }
-        },
-        selectedItemColor: Colors.white,
-        unselectedItemColor: Color(0xFF0C5217),
-        backgroundColor: Colors.white,
-        type: BottomNavigationBarType.fixed,
-        items: [
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.home, 'Home', 0),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.person, 'Account', 1),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.book, 'Note', 2),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.calendar_today, 'Calendar', 3),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.group, 'Group', 4),
-            label: '',
-          ),
-        ],
-      ),
+      bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }
 
@@ -183,6 +134,74 @@ class HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _buildBottomNavigationBar() {
+    return BottomNavigationBar(
+      currentIndex: _currentIndex,
+      onTap: (index) {
+        setState(() {
+          _currentIndex = index;
+        });
+        switch (index) {
+          case 0:
+            break; // อยู่ที่หน้า Home อยู่แล้ว
+          case 1:
+            Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                    builder: (context) =>
+                        AccountPage(username: widget.username)));
+            break;
+          case 2:
+            Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => NotePage(username: widget.username)));
+            break;
+          case 3:
+            Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                    builder: (context) =>
+                        CalendarPage(username: widget.username)));
+            break;
+          case 4:
+            Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                    builder: (context) =>
+                        GroupPage(username: widget.username)));
+            break;
+        }
+      },
+      selectedItemColor: Colors.white,
+      unselectedItemColor: Color(0xFF0C5217),
+      backgroundColor: Colors.white,
+      type: BottomNavigationBarType.fixed,
+      items: [
+        BottomNavigationBarItem(
+          icon: _buildNavBarItem(Icons.home, 'Home', 0),
+          label: '',
+        ),
+        BottomNavigationBarItem(
+          icon: _buildNavBarItem(Icons.person, 'Account', 1),
+          label: '',
+        ),
+        BottomNavigationBarItem(
+          icon: _buildNavBarItem(Icons.book, 'Note', 2),
+          label: '',
+        ),
+        BottomNavigationBarItem(
+          icon: _buildNavBarItem(Icons.calendar_today, 'Calendar', 3),
+          label: '',
+        ),
+        BottomNavigationBarItem(
+          icon: _buildNavBarItem(Icons.group, 'Group', 4),
+          label: '',
+        ),
+      ],
+    );
+  }
+
   Widget _buildNavBarItem(IconData icon, String label, int index) {
     return Container(
       width: double.infinity,
@@ -202,19 +221,6 @@ class HomePageState extends State<HomePage> {
                     _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
           ),
         ],
-      ),
-    );
-  }
-
-  void _navigateToPage(
-      BuildContext context, Widget page, Map<String, dynamic>? userData) {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => page,
-        settings: RouteSettings(
-          arguments: userData,
-        ),
       ),
     );
   }

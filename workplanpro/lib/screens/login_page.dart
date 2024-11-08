@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:workplanpro/screens/account_page.dart';
+import 'package:workplanpro/screens/home_page.dart';
 import 'package:workplanpro/screens/regis_page.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -62,10 +63,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _handleLogin() async {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).clearSnackBars();
-
+    // Check internet connection first
     bool hasInternet = await _checkInternetConnection();
     if (!hasInternet) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -94,38 +92,28 @@ class _LoginPageState extends State<LoginPage> {
       final username = _usernameController.text.trim().toLowerCase();
       final password = _passwordController.text.trim();
 
+      print('Attempting login for user: $username');
+
       final userData = await validateUserCredentials(username, password);
 
       if (userData != null) {
         if (!mounted) return;
 
-        final completeUserData = {
-          ...userData,
-          'username': username,
-        };
-
-        await _saveUserData(completeUserData);
-
-        await Navigator.pushReplacement(
+        // แก้ตรงนี้ - เพิ่ม username parameter
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const AccountPage(),
-            settings: RouteSettings(arguments: completeUserData),
-          ),
+              builder: (context) => HomePage(
+                  username: username) // ส่ง username จาก textController
+              ),
         );
       } else {
         throw Exception('Username or Password is incorrect');
       }
+    } on TimeoutException catch (e) {
+      // ... rest of error handling code
     } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString()),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      // ... rest of error handling code
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

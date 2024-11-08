@@ -5,6 +5,10 @@ import 'calendar_page.dart';
 import 'home_page.dart';
 
 class GroupPage extends StatefulWidget {
+  final String username;
+
+  const GroupPage({Key? key, required this.username}) : super(key: key);
+
   @override
   _GroupPageState createState() => _GroupPageState();
 }
@@ -73,6 +77,7 @@ class _GroupPageState extends State<GroupPage> {
         padding: const EdgeInsets.only(bottom: 10.0),
         child: ElevatedButton.icon(
           onPressed: () {
+            // Action for creating a new group
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: Color(0xFF0C5217),
@@ -92,60 +97,74 @@ class _GroupPageState extends State<GroupPage> {
           ),
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-          switch (index) {
-            case 0:
-              Navigator.pushReplacement(
-                  context, MaterialPageRoute(builder: (context) => HomePage()));
-              break;
-            case 1:
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (context) => AccountPage()));
-              break;
-            case 2:
-              Navigator.pushReplacement(
-                  context, MaterialPageRoute(builder: (context) => NotePage()));
-              break;
-            case 3:
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (context) => CalendarPage()));
-              break;
-            case 4:
-              break;
-          }
-        },
-        selectedItemColor: Colors.white,
-        unselectedItemColor: Color(0xFF0C5217),
-        backgroundColor: Colors.white,
-        type: BottomNavigationBarType.fixed,
-        items: [
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.home, 'Home', 0),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.person, 'Account', 1),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.book, 'Note', 2),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.calendar_today, 'Calendar', 3),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.group, 'Group', 4),
-            label: '',
-          ),
-        ],
-      ),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return BottomNavigationBar(
+      currentIndex: _currentIndex,
+      onTap: (index) {
+        setState(() {
+          _currentIndex = index;
+        });
+        switch (index) {
+          case 0:
+            Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => HomePage(username: widget.username)));
+            break;
+          case 1:
+            Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                    builder: (context) =>
+                        AccountPage(username: widget.username)));
+            break;
+          case 2:
+            Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => NotePage(username: widget.username)));
+            break;
+          case 3:
+            Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                    builder: (context) =>
+                        CalendarPage(username: widget.username)));
+            break;
+          case 4:
+            break; // อยู่ที่หน้า Group อยู่แล้ว
+        }
+      },
+      selectedItemColor: Colors.white,
+      unselectedItemColor: Color(0xFF0C5217),
+      backgroundColor: Colors.white,
+      type: BottomNavigationBarType.fixed,
+      items: [
+        BottomNavigationBarItem(
+          icon: _buildNavBarItem(Icons.home, 'Home', 0),
+          label: '',
+        ),
+        BottomNavigationBarItem(
+          icon: _buildNavBarItem(Icons.person, 'Account', 1),
+          label: '',
+        ),
+        BottomNavigationBarItem(
+          icon: _buildNavBarItem(Icons.book, 'Note', 2),
+          label: '',
+        ),
+        BottomNavigationBarItem(
+          icon: _buildNavBarItem(Icons.calendar_today, 'Calendar', 3),
+          label: '',
+        ),
+        BottomNavigationBarItem(
+          icon: _buildNavBarItem(Icons.group, 'Group', 4),
+          label: '',
+        ),
+      ],
     );
   }
 
@@ -169,19 +188,6 @@ class _GroupPageState extends State<GroupPage> {
                     _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
           )
         ],
-      ),
-    );
-  }
-
-  void _navigateToPage(
-      BuildContext context, Widget page, Map<String, dynamic>? userData) {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => page,
-        settings: RouteSettings(
-          arguments: userData,
-        ),
       ),
     );
   }

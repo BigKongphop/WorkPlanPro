@@ -7,8 +7,14 @@ import 'group_page.dart';
 import 'account_page.dart';
 import '../services/note_database.dart';
 
-
 class NotePage extends StatefulWidget {
+  final String username;
+
+  const NotePage({
+    Key? key,
+    required this.username,
+  }) : super(key: key);
+
   @override
   _NotePageState createState() => _NotePageState();
 }
@@ -29,7 +35,7 @@ class _NotePageState extends State<NotePage> {
     setState(() {
       _isLoading = true;
     });
-    
+
     try {
       final loadedNotes = await _noteDatabase.loadNotes();
       setState(() {
@@ -109,46 +115,49 @@ class _NotePageState extends State<NotePage> {
           ),
           Expanded(
             child: _isLoading
-              ? Center(child: CircularProgressIndicator(color: Color(0xFF0C5217)))
-              : ListView.builder(
-                  itemCount: notes.length,
-                  itemBuilder: (context, index) {
-                    final note = notes[index];
-                    return GestureDetector(
-                      onTap: () {
-                        _showNoteDetail(context, note, index);
-                      },
-                      child: Card(
-                        margin: EdgeInsets.all(8.0),
-                        child: Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(note.date,
-                                  style: TextStyle(
-                                      fontSize: 18, fontWeight: FontWeight.bold)),
-                              Text(note.title, style: TextStyle(fontSize: 16)),
-                              SizedBox(height: 8.0),
-                              Row(
-                                children: List.generate(3, (i) {
-                                  return Icon(
-                                    i < note.rating
-                                        ? Icons.star
-                                        : Icons.star_border,
-                                    color: i < note.rating
-                                        ? Color(0xFF0C5217)
-                                        : Colors.grey,
-                                  );
-                                }),
-                              ),
-                            ],
+                ? Center(
+                    child: CircularProgressIndicator(color: Color(0xFF0C5217)))
+                : ListView.builder(
+                    itemCount: notes.length,
+                    itemBuilder: (context, index) {
+                      final note = notes[index];
+                      return GestureDetector(
+                        onTap: () {
+                          _showNoteDetail(context, note, index);
+                        },
+                        child: Card(
+                          margin: EdgeInsets.all(8.0),
+                          child: Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(note.date,
+                                    style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold)),
+                                Text(note.title,
+                                    style: TextStyle(fontSize: 16)),
+                                SizedBox(height: 8.0),
+                                Row(
+                                  children: List.generate(3, (i) {
+                                    return Icon(
+                                      i < note.rating
+                                          ? Icons.star
+                                          : Icons.star_border,
+                                      color: i < note.rating
+                                          ? Color(0xFF0C5217)
+                                          : Colors.grey,
+                                    );
+                                  }),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
-                ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -179,60 +188,75 @@ class _NotePageState extends State<NotePage> {
           borderRadius: BorderRadius.all(Radius.circular(30.0)),
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-          switch (index) {
-            case 0:
-              Navigator.pushReplacement(
-                  context, MaterialPageRoute(builder: (context) => HomePage()));
-              break;
-            case 1:
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (context) => AccountPage()));
-              break;
-            case 2:
-              break;
-            case 3:
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (context) => CalendarPage()));
-              break;
-            case 4:
-              Navigator.pushReplacement(context,
-                  MaterialPageRoute(builder: (context) => GroupPage()));
-              break;
-          }
-        },
-        selectedItemColor: Colors.white,
-        unselectedItemColor: Color(0xFF0C5217),
-        backgroundColor: Colors.white,
-        type: BottomNavigationBarType.fixed,
-        items: [
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.home, 'Home', 0),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.person, 'Account', 1),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.book, 'Note', 2),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.calendar_today, 'Calendar', 3),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.group, 'Group', 4),
-            label: '',
-          ),
-        ],
-      ),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return BottomNavigationBar(
+      currentIndex: _currentIndex,
+      onTap: (index) {
+        setState(() {
+          _currentIndex = index;
+        });
+        switch (index) {
+          case 0:
+            Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => HomePage(username: widget.username)));
+            break;
+          case 1:
+            Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                    builder: (context) =>
+                        AccountPage(username: widget.username)));
+            break;
+          case 2:
+            break;
+          case 3:
+            Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                    builder: (context) =>
+                        CalendarPage(username: widget.username)));
+            break;
+          case 4:
+            Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                    builder: (context) =>
+                        GroupPage(username: widget.username)));
+            break;
+        }
+      },
+      selectedItemColor: Colors.white,
+      unselectedItemColor: Color(0xFF0C5217),
+      backgroundColor: Colors.white,
+      type: BottomNavigationBarType.fixed,
+      items: [
+        BottomNavigationBarItem(
+          icon: _buildNavBarItem(Icons.home, 'Home', 0),
+          label: '',
+        ),
+        BottomNavigationBarItem(
+          icon: _buildNavBarItem(Icons.person, 'Account', 1),
+          label: '',
+        ),
+        BottomNavigationBarItem(
+          icon: _buildNavBarItem(Icons.book, 'Note', 2),
+          label: '',
+        ),
+        BottomNavigationBarItem(
+          icon: _buildNavBarItem(Icons.calendar_today, 'Calendar', 3),
+          label: '',
+        ),
+        BottomNavigationBarItem(
+          icon: _buildNavBarItem(Icons.group, 'Group', 4),
+          label: '',
+        ),
+      ],
     );
   }
 

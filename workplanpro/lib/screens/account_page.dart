@@ -10,7 +10,12 @@ import 'note_page.dart';
 import 'login_page.dart';
 
 class AccountPage extends StatefulWidget {
-  const AccountPage({Key? key}) : super(key: key);
+  final String username; // เพิ่ม field
+
+  const AccountPage(
+      {Key? key, required this.username // เพิ่ม required parameter
+      })
+      : super(key: key);
 
   @override
   _AccountPageState createState() => _AccountPageState();
@@ -96,23 +101,14 @@ class _AccountPageState extends State<AccountPage> {
     try {
       setState(() => isLoading = true);
 
-      final args = ModalRoute.of(context)?.settings.arguments;
-      if (args is Map<String, dynamic>) {
-        await _saveUserDataLocally(args);
-        setState(() {
-          userData = Map<String, dynamic>.from(args);
-          currentUsername = args['username'] as String?;
-          isLoading = false;
-        });
-        return;
-      }
-
+      // ลองโหลดข้อมูลจาก SharedPreferences ก่อน
       await _loadLocalUserData();
 
-      if (userData == null && currentUsername != null) {
+      // ถ้ามีการเชื่อมต่ออินเทอร์เน็ต จึงจะโหลดข้อมูลจาก Firestore
+      if (_hasInternetConnection) {
         final userDoc = await FirebaseFirestore.instance
             .collection('user')
-            .where('username', isEqualTo: currentUsername)
+            .where('username', isEqualTo: widget.username)
             .get()
             .timeout(
               const Duration(seconds: 10),
@@ -129,17 +125,26 @@ class _AccountPageState extends State<AccountPage> {
             });
           }
         } else {
-          if (mounted) {
-            setState(() => isLoading = false);
-            _showError('User data not found');
-          }
+          // ถ้าไม่พบข้อมูลใน Firestore ให้ใช้ข้อมูลจาก SharedPreferences
+          setState(() => isLoading = false);
         }
+      } else {
+        // ถ้าไม่มีการเชื่อมต่ออินเทอร์เน็ต ให้ใช้ข้อมูลจาก SharedPreferences
+        setState(() => isLoading = false);
       }
     } catch (e) {
       print('Error loading user data: $e');
       if (mounted) {
         setState(() => isLoading = false);
-        _showError('Error loading user data: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading data: $e'),
+            action: SnackBarAction(
+              label: 'Retry',
+              onPressed: () => _checkConnectivityAndLoadData(),
+            ),
+          ),
+        );
       }
     }
   }
@@ -223,10 +228,7 @@ class _AccountPageState extends State<AccountPage> {
     return Scaffold(
       key: _scaffoldKey,
       appBar: AppBar(
-        title: const Text(
-          'Account',
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text('Account', style: TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF0C5217),
         actions: [
           IconButton(
@@ -235,13 +237,22 @@ class _AccountPageState extends State<AccountPage> {
           ),
         ],
       ),
-      body: !_hasInternetConnection
-          ? _buildNoInternetView()
-          : isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(color: Color(0xFF0C5217)),
-                )
-              : _buildUserDataView(),
+      body: isLoading
+          ? const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(color: Color(0xFF0C5217)),
+                  SizedBox(height: 16),
+                  Text('Loading user data...'),
+                ],
+              ),
+            )
+          : !_hasInternetConnection
+              ? _buildNoInternetView()
+              : userData == null
+                  ? const Center(child: Text('No user data available'))
+                  : _buildUserDataView(),
       bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }
@@ -394,27 +405,56 @@ class _AccountPageState extends State<AccountPage> {
     return BottomNavigationBar(
       currentIndex: _currentIndex,
       onTap: (index) {
-        if (index == _currentIndex) return;
-
-        setState(() => _currentIndex = index);
-
+        setState(() {
+          _currentIndex = index;
+        });
         switch (index) {
           case 0:
-            _navigateToPage(HomePage());
+            if (userData != null) {
+              // เช็ค null
+              Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          HomePage(username: userData!['username'])));
+            }
             break;
+          case 1:
+            break; // อยู่ที่หน้า Account อยู่แล้ว
           case 2:
-            _navigateToPage(NotePage());
+            if (userData != null) {
+              // เช็ค null
+              Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          NotePage(username: userData!['username'])));
+            }
             break;
           case 3:
-            _navigateToPage(CalendarPage());
+            if (userData != null) {
+              // เช็ค null
+              Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          CalendarPage(username: userData!['username'])));
+            }
             break;
           case 4:
-            _navigateToPage(GroupPage());
+            if (userData != null) {
+              // เช็ค null
+              Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          GroupPage(username: userData!['username'])));
+            }
             break;
         }
       },
       selectedItemColor: Colors.white,
-      unselectedItemColor: const Color(0xFF0C5217),
+      unselectedItemColor: Color(0xFF0C5217),
       backgroundColor: Colors.white,
       type: BottomNavigationBarType.fixed,
       items: [
