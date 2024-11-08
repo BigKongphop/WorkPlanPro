@@ -16,6 +16,7 @@ class ActivityDatabase {
       return snapshot.docs.map((doc) {
         Map<String, dynamic> data = doc.data();
         return Activity(
+          id: doc.id,
           title: data['title'] ?? '',
           description: data['description'] ?? '',
           date: DateTime.parse(data['date']),
@@ -36,9 +37,10 @@ class ActivityDatabase {
   }
 
   // บันทึกกิจกรรมใหม่
-  Future<void> saveActivity(String username, Activity activity) async {
+  Future<Activity> saveActivity(String username, Activity activity) async {
     try {
-      await _firestore.collection('activities').add({
+      // เพิ่มข้อมูลใน Firestore และรับ DocumentReference กลับมา
+      final docRef = await _firestore.collection('activities').add({
         'username': username,
         'title': activity.title,
         'description': activity.description,
@@ -49,6 +51,16 @@ class ActivityDatabase {
         'endTimeMinute': activity.endTime.minute,
         'createdAt': FieldValue.serverTimestamp(),
       });
+
+      // สร้าง Activity ใหม่ที่มี id จาก Firestore
+      return Activity(
+        id: docRef.id,
+        title: activity.title,
+        description: activity.description,
+        date: activity.date,
+        startTime: activity.startTime,
+        endTime: activity.endTime,
+      );
     } catch (e) {
       print('Error saving activity: $e');
       throw e;
@@ -57,6 +69,10 @@ class ActivityDatabase {
 
   // อัพเดทกิจกรรม
   Future<void> updateActivity(String docId, Activity activity) async {
+    if (docId.isEmpty) {
+      throw Exception('Document ID cannot be empty');
+    }
+
     try {
       await _firestore.collection('activities').doc(docId).update({
         'title': activity.title,
@@ -76,6 +92,10 @@ class ActivityDatabase {
 
   // ลบกิจกรรม
   Future<void> deleteActivity(String docId) async {
+    if (docId.isEmpty) {
+      throw Exception('Document ID cannot be empty');
+    }
+
     try {
       await _firestore.collection('activities').doc(docId).delete();
     } catch (e) {
