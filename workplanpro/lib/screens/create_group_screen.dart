@@ -1,5 +1,10 @@
+import 'dart:io';
+import 'package:path/path.dart' as path;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import './choose_group_image_screen.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   final String currentUsername;
@@ -15,149 +20,180 @@ class CreateGroupScreen extends StatefulWidget {
 
 class _CreateGroupScreenState extends State<CreateGroupScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
   bool _isLoading = false;
-  String? _selectedImageUrl;
+  String? _nameError;
+  dynamic _selectedImage;
+
+  Future<String?> _uploadImage() async {
+    if (_selectedImage == null) return null;
+    
+    try {
+      if (_selectedImage is File) {
+        final File imageFile = _selectedImage as File;
+        final String fileName = path.basename(imageFile.path);
+        final Reference storageRef = FirebaseStorage.instance
+            .ref()
+            .child('group_images')
+            .child('${DateTime.now().millisecondsSinceEpoch}_$fileName');
+
+        final UploadTask uploadTask = storageRef.putFile(imageFile);
+        final TaskSnapshot snapshot = await uploadTask;
+        return await snapshot.ref.getDownloadURL();
+      } else if (_selectedImage is String) {
+        return _selectedImage;
+      }
+    } catch (e) {
+      print('Error uploading image: $e');
+      return null;
+    }
+    return null;
+  }
 
   Future<void> _createGroup() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _nameError = null;
+    });
 
     try {
-      final firestore = FirebaseFirestore.instance;
+      final String? imageUrl = await _uploadImage();
       
-      // ตรวจสอบชื่อกลุ่มซ้ำ
-      final groupSnapshot = await firestore
-          .collection('groups')
-          .where('name', isEqualTo: _nameController.text)
-          .get();
-
-      if (groupSnapshot.docs.isNotEmpty) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Group name already exists')),
-        );
-        return;
-      }
-
-      final docRef = await firestore.collection('groups').add({
-        'name': _nameController.text,
+      await FirebaseFirestore.instance.collection('groups').add({
+        'name': _nameController.text.trim(),
+        'description': _descriptionController.text.trim(),
         'creatorName': widget.currentUsername,
-        'imageUrl': _selectedImageUrl ?? '',
         'createdAt': FieldValue.serverTimestamp(),
+        'members': [widget.currentUsername],
+        'imageUrl': imageUrl ?? '',
       });
 
-      await docRef.update({'id': docRef.id});
+      if (!mounted) return;
+      Navigator.pop(context, true);
       
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
     } catch (e) {
-      if (!mounted) return;
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to create group: ${e.toString()}')),
+        SnackBar(content: Text('Error creating group: $e')),
       );
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
+    }
+  }
+
+  void _showImagePicker() async {
+    try {
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChooseGroupImageScreen(
+            currentImage: _selectedImage is String ? _selectedImage : null,
+            onImageSelected: (image) {
+              if (mounted) {
+                setState(() => _selectedImage = image);
+              }
+            },
+          ),
+        ),
+      );
+
+      if (result != null && mounted) {
+        setState(() {
+          _selectedImage = result;
+        });
       }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error selecting image: $e')),
+        );
+      }
+      print('Error in _showImagePicker: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: const Color(0xFF0C5217),
-        title: const Text('Create New Group', style: TextStyle(color: Colors.white)),
-        leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+        title: const Text(
+          'Create New Group',
+          style: TextStyle(color: Colors.white),
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const SizedBox(height: 20),
-              GestureDetector(
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Image upload will be implemented')),
-                  );
-                },
-                child: Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: const Color(0xFF0C5217),
-                      width: 2,
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.add_a_photo,
-                    size: 40,
-                    color: Color(0xFF0C5217),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              // ชื่อกลุ่ม
-              TextFormField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: 'Group Name',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF0C5217), width: 2),
-                  ),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a group name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              // แสดงชื่อผู้สร้าง
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.person, color: Color(0xFF0C5217)),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Created by: ${widget.currentUsername}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: GestureDetector(
+                    onTap: _showImagePicker,
+                    child: Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        shape: BoxShape.circle,
+                        image: _selectedImage != null
+                            ? DecorationImage(
+                                fit: BoxFit.cover,
+                                image: _selectedImage is File
+                                    ? FileImage(_selectedImage as File)
+                                    : AssetImage(_selectedImage as String)
+                                        as ImageProvider,
+                              )
+                            : null,
                       ),
+                      child: _selectedImage == null
+                          ? const Icon(
+                              Icons.add_photo_alternate,
+                              size: 40,
+                              color: Colors.grey,
+                            )
+                          : null,
                     ),
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 32),
-              if (_isLoading)
-                const CircularProgressIndicator(color: Color(0xFF0C5217))
-              else
+                const SizedBox(height: 24),
+                TextFormField(
+                  controller: _nameController,
+                  decoration: InputDecoration(
+                    labelText: 'Group Name',
+                    errorText: _nameError,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value?.trim().isEmpty ?? true) {
+                      return 'Please enter a group name';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _descriptionController,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: 'Description (Optional)',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _createGroup,
+                    onPressed: _isLoading ? null : _createGroup,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0C5217),
                       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -165,13 +201,27 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
-                      'Create Group',
-                      style: TextStyle(fontSize: 18, color: Colors.white),
-                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text(
+                            'Create Group',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.white,
+                            ),
+                          ),
                   ),
                 ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -181,6 +231,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 }
