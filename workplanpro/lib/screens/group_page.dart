@@ -1,4 +1,5 @@
- import 'package:flutter/material.dart';
+//group page
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'note_page.dart';
 import 'account_page.dart';
@@ -6,6 +7,7 @@ import 'calendar_page.dart';
 import 'home_page.dart';
 import 'create_group_screen.dart';
 import 'group_detail_screen.dart';
+import 'package:motion_tab_bar_v2/motion-tab-bar.dart';
 
 class GroupPage extends StatefulWidget {
   final String username;
@@ -105,6 +107,12 @@ class _GroupPageState extends State<GroupPage> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0C5217),
@@ -147,7 +155,8 @@ class _GroupPageState extends State<GroupPage> {
               ),
               child: isLoading
                   ? const Center(
-                      child: CircularProgressIndicator(color: Color(0xFF0C5217)))
+                      child:
+                          CircularProgressIndicator(color: Color(0xFF0C5217)))
                   : ListView.builder(
                       itemCount: filteredGroups.length,
                       itemBuilder: (context, index) {
@@ -180,8 +189,8 @@ class _GroupPageState extends State<GroupPage> {
                             child: ListTile(
                               leading: CircleAvatar(
                                 backgroundColor: Colors.grey[300],
-                                child: Icon(Icons.group,
-                                    color: Colors.grey[600]),
+                                child:
+                                    Icon(Icons.group, color: Colors.grey[600]),
                               ),
                               title: Text(
                                 group['name'] ?? 'Unnamed Group',
@@ -230,9 +239,20 @@ class _GroupPageState extends State<GroupPage> {
           style: TextStyle(color: Colors.white),
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
+      bottomNavigationBar: MotionTabBar(
+        labels: const ["Home", "Account", "Notes", "Calendar", "Groups"],
+        icons: const [
+          Icons.home,
+          Icons.person,
+          Icons.book,
+          Icons.calendar_today,
+          Icons.group,
+        ],
+        initialSelectedTab: "Groups",
+        tabIconColor: const Color(0xFF0C5217),
+        tabSelectedColor:
+            Colors.green, // เปลี่ยนสีพื้นหลังของไอเทมที่เลือกเป็นสีเขียว
+        onTabItemSelected: (int index) {
           setState(() {
             _currentIndex = index;
           });
@@ -241,20 +261,22 @@ class _GroupPageState extends State<GroupPage> {
               Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => HomePage(username: widget.username)));
+                      builder: (context) =>
+                          HomePage(username: widget.username)));
               break;
             case 1:
               Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
                       builder: (context) =>
-                          AccountPage(username: widget.username)));
+                          AccountPage(initialUsername: widget.username)));
               break;
             case 2:
               Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => NotePage(username: widget.username)));
+                      builder: (context) =>
+                          NotePage(username: widget.username)));
               break;
             case 3:
               Navigator.pushReplacement(
@@ -267,62 +289,7 @@ class _GroupPageState extends State<GroupPage> {
               break;
           }
         },
-        selectedItemColor: Colors.white,
-        unselectedItemColor: const Color(0xFF0C5217),
-        backgroundColor: Colors.white,
-        type: BottomNavigationBarType.fixed,
-        items: [
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.home, 'Home', 0),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.person, 'Account', 1),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.book, 'Note', 2),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.calendar_today, 'Calendar', 3),
-            label: '',
-          ),
-          BottomNavigationBarItem(
-            icon: _buildNavBarItem(Icons.group, 'Group', 4),
-            label: '',
-          ),
-        ],
       ),
     );
-  }
-
-  Widget _buildNavBarItem(IconData icon, String label, int index) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      decoration: BoxDecoration(
-        color: _currentIndex == index ? const Color(0xFF0C5217) : Colors.transparent,
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon,
-              color: _currentIndex == index ? Colors.white : const Color(0xFF0C5217)),
-          Text(
-            label,
-            style: TextStyle(
-                color:
-                    _currentIndex == index ? Colors.white : const Color(0xFF0C5217)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 }

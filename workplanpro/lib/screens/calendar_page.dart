@@ -1,4 +1,6 @@
+//calendar page
 import 'package:flutter/material.dart';
+import 'package:motion_tab_bar_v2/motion-tab-bar.dart';
 import 'package:intl/intl.dart';
 import 'note_page.dart';
 import 'account_page.dart';
@@ -227,7 +229,55 @@ class _CalendarPageState extends State<CalendarPage> {
           vertical: 12.0,
         ),
       ),
-      bottomNavigationBar: _buildBottomNavigationBar(),
+      bottomNavigationBar: MotionTabBar(
+        labels: const ["Home", "Account", "Notes", "Calendar", "Groups"],
+        icons: const [
+          Icons.home,
+          Icons.person,
+          Icons.book,
+          Icons.calendar_today,
+          Icons.group,
+        ],
+        initialSelectedTab: "Calendar",
+        tabIconColor: const Color(0xFF0C5217),
+        tabSelectedColor:
+            Colors.green, // เปลี่ยนสีพื้นหลังของไอเทมที่เลือกเป็นสีเขียว
+        onTabItemSelected: (int index) {
+          switch (index) {
+            case 0:
+              Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          HomePage(username: widget.username)));
+              break;
+            case 1:
+              Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          AccountPage(initialUsername: widget.username)));
+              break;
+            case 2:
+              Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          NotePage(username: widget.username)));
+              break;
+            case 3:
+              // อยู่ที่หน้า Calendar อยู่แล้ว
+              break;
+            case 4:
+              Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          GroupPage(username: widget.username)));
+              break;
+          }
+        },
+      ),
     );
   }
 
@@ -606,7 +656,7 @@ class _CalendarPageState extends State<CalendarPage> {
                 context,
                 MaterialPageRoute(
                     builder: (context) =>
-                        AccountPage(username: widget.username)));
+                        AccountPage(initialUsername: widget.username)));
             break;
           case 2:
             Navigator.pushReplacement(
@@ -639,7 +689,7 @@ class _CalendarPageState extends State<CalendarPage> {
           label: '',
         ),
         BottomNavigationBarItem(
-          icon: _buildNavBarItem(Icons.book, 'Note', 2),
+          icon: _buildNavBarItem(Icons.book, 'Notes', 2),
           label: '',
         ),
         BottomNavigationBarItem(
@@ -647,7 +697,7 @@ class _CalendarPageState extends State<CalendarPage> {
           label: '',
         ),
         BottomNavigationBarItem(
-          icon: _buildNavBarItem(Icons.group, 'Group', 4),
+          icon: _buildNavBarItem(Icons.group, 'Groups', 4),
           label: '',
         ),
       ],

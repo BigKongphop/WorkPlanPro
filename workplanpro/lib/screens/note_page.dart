@@ -1,4 +1,6 @@
+//note page
 import 'package:flutter/material.dart';
+import 'package:motion_tab_bar_v2/motion-tab-bar.dart';
 import 'create_note_screen.dart';
 import '../models/note.dart';
 import 'home_page.dart';
@@ -188,75 +190,57 @@ class _NotePageState extends State<NotePage> {
           borderRadius: BorderRadius.all(Radius.circular(30.0)),
         ),
       ),
-      bottomNavigationBar: _buildBottomNavigationBar(),
-    );
-  }
-
-  Widget _buildBottomNavigationBar() {
-    return BottomNavigationBar(
-      currentIndex: _currentIndex,
-      onTap: (index) {
-        setState(() {
-          _currentIndex = index;
-        });
-        switch (index) {
-          case 0:
-            Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => HomePage(username: widget.username)));
-            break;
-          case 1:
-            Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                    builder: (context) =>
-                        AccountPage(username: widget.username)));
-            break;
-          case 2:
-            break;
-          case 3:
-            Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                    builder: (context) =>
-                        CalendarPage(username: widget.username)));
-            break;
-          case 4:
-            Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                    builder: (context) =>
-                        GroupPage(username: widget.username)));
-            break;
-        }
-      },
-      selectedItemColor: Colors.white,
-      unselectedItemColor: Color(0xFF0C5217),
-      backgroundColor: Colors.white,
-      type: BottomNavigationBarType.fixed,
-      items: [
-        BottomNavigationBarItem(
-          icon: _buildNavBarItem(Icons.home, 'Home', 0),
-          label: '',
-        ),
-        BottomNavigationBarItem(
-          icon: _buildNavBarItem(Icons.person, 'Account', 1),
-          label: '',
-        ),
-        BottomNavigationBarItem(
-          icon: _buildNavBarItem(Icons.book, 'Note', 2),
-          label: '',
-        ),
-        BottomNavigationBarItem(
-          icon: _buildNavBarItem(Icons.calendar_today, 'Calendar', 3),
-          label: '',
-        ),
-        BottomNavigationBarItem(
-          icon: _buildNavBarItem(Icons.group, 'Group', 4),
-          label: '',
-        ),
-      ],
+      bottomNavigationBar: MotionTabBar(
+        labels: const ["Home", "Account", "Notes", "Calendar", "Groups"],
+        icons: const [
+          Icons.home,
+          Icons.person,
+          Icons.book,
+          Icons.calendar_today,
+          Icons.group,
+        ],
+        initialSelectedTab: "Notes",
+        tabIconColor: const Color(0xFF0C5217),
+        tabSelectedColor:
+            Colors.green, // เปลี่ยนสีพื้นหลังของไอเทมที่เลือกเป็นสีเขียว
+        onTabItemSelected: (int index) {
+          setState(() {
+            _currentIndex = index;
+          });
+          switch (index) {
+            case 0:
+              Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          HomePage(username: widget.username)));
+              break;
+            case 1:
+              Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          AccountPage(initialUsername: widget.username)));
+              break;
+            case 2:
+              break;
+            case 3:
+              Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          CalendarPage(username: widget.username)));
+              break;
+            case 4:
+              Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          GroupPage(username: widget.username)));
+              break;
+          }
+        },
+      ),
     );
   }
 
