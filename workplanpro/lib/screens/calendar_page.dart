@@ -1,4 +1,3 @@
-//calendar page
 import 'package:flutter/material.dart';
 import 'package:motion_tab_bar_v2/motion-tab-bar.dart';
 import 'package:intl/intl.dart';
@@ -23,7 +22,7 @@ class _CalendarPageState extends State<CalendarPage> {
   final ActivityDatabase _activityDatabase = ActivityDatabase();
   int _currentIndex = 3;
   DateTime _currentMonth = DateTime.now();
-  List<Activity> _personalActivities = [];
+  List<Activity> _activities = [];
   List<Activity> _groupActivities = [];
   bool _isCalendarExpanded = true;
   bool _isPersonalActivitiesExpanded = true;
@@ -42,7 +41,7 @@ class _CalendarPageState extends State<CalendarPage> {
       final activities =
           await _activityDatabase.loadActivities(widget.username);
       setState(() {
-        _personalActivities = activities;
+        _activities = activities;
         _sortActivities();
         _isLoading = false;
       });
@@ -87,7 +86,7 @@ class _CalendarPageState extends State<CalendarPage> {
                 });
               },
               title: Text(
-                'Calendar',
+                'Mouth Calendar',
                 style:
                     TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               ),
@@ -134,7 +133,7 @@ class _CalendarPageState extends State<CalendarPage> {
                           color: Color(0xFF0C5217),
                         ),
                         children: [
-                          _buildActivitiesList(_personalActivities),
+                          _buildActivitiesList(_activities),
                         ],
                       ),
                     ),
@@ -186,7 +185,7 @@ class _CalendarPageState extends State<CalendarPage> {
               final savedActivity =
                   await _activityDatabase.saveActivity(widget.username, result);
               setState(() {
-                _personalActivities.add(savedActivity);
+                _activities.add(savedActivity);
                 _sortActivities();
               });
               if (mounted) {
@@ -344,7 +343,7 @@ class _CalendarPageState extends State<CalendarPage> {
               final isToday = date.day == now.day &&
                   date.month == now.month &&
                   date.year == now.year;
-              final hasActivity = _personalActivities.any((activity) =>
+              final hasActivity = _activities.any((activity) =>
                       activity.date.year == date.year &&
                       activity.date.month == date.month &&
                       activity.date.day == date.day) ||
@@ -352,21 +351,27 @@ class _CalendarPageState extends State<CalendarPage> {
                       activity.date.year == date.year &&
                       activity.date.month == date.month &&
                       activity.date.day == date.day);
-              return Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: hasActivity
-                      ? Colors.white
-                      : (isToday ? Colors.white.withOpacity(0.3) : null),
-                ),
-                child: Center(
-                  child: Text(
-                    '$day',
-                    style: TextStyle(
-                      color: hasActivity ? Color(0xFF0C5217) : Colors.white,
-                      fontWeight: isToday || hasActivity
-                          ? FontWeight.bold
-                          : FontWeight.normal,
+
+              return Center(
+                child: Container(
+                  width: 32, // ลดขนาดความกว้าง
+                  height: 32, // ลดขนาดความสูง
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: hasActivity
+                        ? Colors.white
+                        : (isToday ? Colors.white.withOpacity(0.3) : null),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$day',
+                      style: TextStyle(
+                        color: hasActivity ? Color(0xFF0C5217) : Colors.white,
+                        fontWeight: isToday || hasActivity
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                        fontSize: 14, // ลดขนาดตัวอักษร
+                      ),
                     ),
                   ),
                 ),
@@ -621,7 +626,7 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   void _sortActivities() {
-    _personalActivities.sort((a, b) {
+    _activities.sort((a, b) {
       int dateComparison = b.date.compareTo(a.date);
       if (dateComparison != 0) return dateComparison;
       return b.startTime.hour * 60 +
