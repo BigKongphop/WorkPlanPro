@@ -383,22 +383,17 @@ class _AccountPageState extends State<AccountPage> {
   }
 
   void _editProfile() async {
-    if (userData != null) {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => EditProfilePage(userData: userData!),
-        ),
-      );
-      // เมื่อกลับมาจากหน้า EditProfilePage ให้โหลดข้อมูลใหม่
-      _loadUserData();
-    }
-    Navigator.push(
+    final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => EditProfilePage(userData: userData!),
       ),
-    ).then((_) => _loadUserData());
+    );
+
+    // ตรวจสอบผลลัพธ์และโหลดข้อมูลใหม่
+    if (result == true) {
+      await _loadUserData();
+    }
   }
 
   Future<void> _checkUserAuthenticationStatus() async {

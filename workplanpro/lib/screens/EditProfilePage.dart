@@ -342,6 +342,7 @@ class _EditProfilePageState extends State<EditProfilePage>
     });
     _setupConnectivityListener();
     _initializeData();
+    _setupChangeListeners();
     // Delay the setup of change listeners to ensure all data is loaded
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializePage();
@@ -513,10 +514,7 @@ class _EditProfilePageState extends State<EditProfilePage>
     }
   }
 
-  // ฟังก์ชันติดตามการเปลี่ยนแปลง
   void _setupChangeListeners() {
-    if (!_isInitialized) return;
-
     void checkChanges() {
       if (!mounted) return;
 
@@ -528,15 +526,11 @@ class _EditProfilePageState extends State<EditProfilePage>
           (widget.userData['phone'] ?? '').trim();
       bool addressChanged = _addressController.text.trim() !=
           (widget.userData['address'] ?? '').trim();
-      bool profileImageChanged = (_profileImageUrl ?? '') !=
-          (widget.userData['profileImageUrl'] ?? '');
 
+      // Update hasChanges state
       safeSetState(() {
-        _hasChanges = usernameChanged ||
-            emailChanged ||
-            phoneChanged ||
-            addressChanged ||
-            profileImageChanged;
+        _hasChanges =
+            usernameChanged || emailChanged || phoneChanged || addressChanged;
       });
     }
 
@@ -581,12 +575,15 @@ class _EditProfilePageState extends State<EditProfilePage>
 
   @override
   void dispose() {
-    // ลบ Observer
+    // Dispose the AnimationController first
+    _animationController.dispose();
+
+    // Remove Observer
     WidgetsBinding.instance.removeObserver(this);
     _connectivitySubscription?.cancel();
     _isDisposed = true;
 
-    // ปิด Controllers
+    // Dispose Controllers
     _usernameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
@@ -781,8 +778,17 @@ class _EditProfilePageState extends State<EditProfilePage>
   }
 
   void _showSuccessSnackBar(String message) {
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.green));
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+      ),
+    );
+
+    // ตั้งค่า _hasChanges เป็น false หลังจากแสดง Snackbar แจ้งความสำเร็จ
+    _hasChanges = false;
   }
 
   Future<void> _selectProfileImage() async {
@@ -1140,9 +1146,8 @@ class _EditProfilePageState extends State<EditProfilePage>
           icon: Icons.phone_outlined,
           title: 'เบอร์โทรศัพท์',
           value: _phoneController.text,
-          verificationStatus:
-              _isPhoneVerified ? 'ยืนยันแล้ว' : 'ยังไม่ได้ยืนยัน',
-          isVerified: _isPhoneVerified,
+          verificationStatus: 'ไม่ต้องยืนยัน',
+          isVerified: true, // แสดงว่ามีเบอร์โทรศัพท์
           onTap: () => _showPhoneUpdateDialog(),
         ),
       ],
@@ -1228,42 +1233,32 @@ class _EditProfilePageState extends State<EditProfilePage>
   }
 
   Future<bool> _onWillPop() async {
-    // ตรวจสอบว่ามีการเปลี่ยนแปลงข้อมูลหรือไม่
+    // ตรวจสอบว่ามีการเปลี่ยนแปลงหรือไม่
     if (_hasChanges) {
-      // แสดง Dialog แจ้งเตือน
       final result = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: Text('ข้อมูลยังไม่ได้บันทึก'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('คุณมีการแก้ไขข้อมูลที่ยังไม่ได้บันทึก'),
-              SizedBox(height: 10),
-              Text(
-                'ต้องการออกโดยไม่บันทึกหรือไม่?',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 15),
-              // แสดงรายการฟิลด์ที่มีการเปลี่ยนแปลง
-              ..._buildChangedFieldsList(),
-            ],
-          ),
+          content:
+              Text('คุณมีการแก้ไขข้อมูลที่ยังไม่ได้บันทึก ต้องการออกหรือไม่?'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
+              onPressed: () => Navigator.of(context).pop(false), // ยกเลิก
               child: Text('ยกเลิก', style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: Text('ออกโดยไม่บันทึก'),
+              onPressed: () {
+                // ถ้าเลือกออก ให้กลับไปที่ AccountPage
+                Navigator.of(context).pop(true);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              child: Text('ออก'),
             ),
           ],
         ),
       );
 
-      // ถ้าผู้ใช้เลือกที่จะออก
+      // ส่งค่ากลับเพื่อควบคุมการออกจากหน้า
       return result ?? false;
     }
 
@@ -1350,10 +1345,14 @@ class _EditProfilePageState extends State<EditProfilePage>
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
-      onWillPop: _onWillPop,
+      onWillPop: _onWillPop, // ใช้เมธอดนี้เพื่อจัดการการออกจากหน้า
       child: Scaffold(
         appBar: AppBar(
           title: Text('แก้ไขโปรไฟล์'),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back),
+            onPressed: () => _handleBackNavigation(), // ใช้เมธอดใหม่นี้
+          ),
           actions: [
             if (_hasChanges)
               TextButton(
@@ -1372,7 +1371,6 @@ class _EditProfilePageState extends State<EditProfilePage>
             ? Stack(
                 children: [
                   _buildBody(),
-                  // Floating save button
                   Positioned(
                     bottom: 20,
                     left: 20,
@@ -1392,6 +1390,15 @@ class _EditProfilePageState extends State<EditProfilePage>
               ),
       ),
     );
+  } // เพิ่มเมธอดใหม่นี้
+
+  void _handleBackNavigation() {
+    _onWillPop().then((canPop) {
+      if (canPop) {
+        // ส่งค่ากลับไปยังหน้า AccountPage เพื่อบอกว่ามีการอัปเดต
+        Navigator.of(context).pop(true);
+      }
+    });
   }
 
   Widget _buildFloatingActionButton() {
@@ -1854,23 +1861,23 @@ class _EditProfilePageState extends State<EditProfilePage>
         return;
       }
 
-      // อัปเดตอีเมลใน Firebase Authentication หากมีการเปลี่ยนแปลง
-      if (_emailController.text.trim() != currentUser.email) {
-        try {
-          await _handleEmailUpdate(_emailController.text.trim());
-        } catch (e) {
-          _showErrorSnackBar('เกิดข้อผิดพลาดในการอัปเดตอีเมล: ${e.toString()}');
-          return;
-        }
-      }
-
       // อัปเดตข้อมูลใน Firestore
-      await _saveUpdateHistory(updateData);
-      await _updateUserProfile(currentUser, updateData);
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .update(updateData);
 
-      safeSetState(() {
-        _hasChanges = false;
+      // อัปเดต local state
+      setState(() {
+        // อัปเดตข้อมูลใน widget.userData
+        updateData.forEach((key, value) {
+          widget.userData[key] = value;
+        });
+        _hasChanges = false; // ตั้งค่าเป็น false หลังจากบันทึก
       });
+
+      // แสดง Snackbar แจ้งความสำเร็จ
+      _showSuccessSnackBar('บันทึกข้อมูลสำเร็จ');
     } catch (e) {
       print('เกิดข้อผิดพลาดในการบันทึก: $e');
 
@@ -1880,6 +1887,20 @@ class _EditProfilePageState extends State<EditProfilePage>
           SnackBar(content: Text('ข้อผิดพลาด: $e')),
         );
       }
+    }
+  }
+
+  Future<void> _navigateToEditProfile() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditProfilePage(userData: _userData),
+      ),
+    );
+
+    // ถ้ามีการอัปเดตข้อมูล ให้รีโหลดข้อมูลผู้ใช้
+    if (result == true) {
+      await _fetchUserData(); // เมธอดโหลดข้อมูลผู้ใช้ใหม่
     }
   }
 
@@ -1923,6 +1944,9 @@ class _EditProfilePageState extends State<EditProfilePage>
         _profileImageUrl != widget.userData['profileImageUrl']) {
       updateData['profileImageUrl'] = _profileImageUrl;
     }
+
+    // ตรวจสอบว่ามีการเปลี่ยนแปลงหรือไม่
+    _hasChanges = updateData.isNotEmpty;
   }
 
   Future<void> _updateUserProfile(
@@ -1942,7 +1966,7 @@ class _EditProfilePageState extends State<EditProfilePage>
         updateData.forEach((key, value) {
           widget.userData[key] = value;
         });
-        _hasChanges = false;
+        _hasChanges = false; // ตั้งค่าเป็น false หลังจากบันทึก
       });
 
       // แสดง Snackbar แจ้งความสำเร็จ
@@ -2105,6 +2129,11 @@ class _EditProfilePageState extends State<EditProfilePage>
 
       // รีโหลดข้อมูลผู้ใช้
       await currentUser.reload();
+      // แสดง Snackbar แจ้งความสำเร็จ
+      _showSuccessSnackBar('อัปเดตอีเมลและส่งการยืนยันแล้ว');
+
+      // ตั้งค่า _hasChanges เป็น false หลังจากแสดง Snackbar แจ้งความสำเร็จ
+      _hasChanges = false;
     } on FirebaseAuthException catch (e) {
       // จัดการข้อผิดพลาดเฉพาะของ Firebase Authentication
       _handleEmailUpdateError(e);
@@ -2370,14 +2399,6 @@ class _EditProfilePageState extends State<EditProfilePage>
                   });
                 },
               ),
-              if (_isPhoneVerified)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Text(
-                    'ยืนยันเบอร์โทรศัพท์แล้ว',
-                    style: TextStyle(color: Colors.green),
-                  ),
-                ),
             ],
           ),
           actions: [
@@ -2392,7 +2413,7 @@ class _EditProfilePageState extends State<EditProfilePage>
                       _handlePhoneUpdate(context, phoneController.text);
                     }
                   : null,
-              child: Text('ส่ง OTP'),
+              child: Text('บันทึก'),
             ),
           ],
         ),
@@ -2423,19 +2444,43 @@ class _EditProfilePageState extends State<EditProfilePage>
   Future<void> _handlePhoneUpdate(
       BuildContext context, String phoneNumber) async {
     try {
-      final cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d]'), '');
-      final formattedNumber = '+66${cleanNumber.substring(1)}';
+      User? currentUser = FirebaseAuth.instance.currentUser;
 
-      // ส่ง OTP
-      await _sendPhoneOTP(formattedNumber);
+      if (currentUser == null) {
+        _showErrorSnackBarSafely('ไม่พบผู้ใช้งาน');
+        return;
+      }
+
+      // อัปเดตเบอร์โทรศัพท์ใน Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .update({
+        'phone': phoneNumber,
+      });
+
+      // อัปเดตเบอร์โทรศัพท์ใน local state
+      if (mounted) {
+        setState(() {
+          _phoneController.text = phoneNumber;
+        });
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('เกิดข้อผิดพลาดในการส่ง OTP: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showErrorSnackBarSafely(
+          'เกิดข้อผิดพลาดในการอัปเดตเบอร์โทรศัพท์: ${e.toString()}');
     }
+  } // เพิ่มเมธอดใหม่เพื่อแสดง SnackBar อย่างปลอดภัย
+
+  void _showErrorSnackBarSafely(String message) {
+    if (!mounted) return;
+
+    // ใช้ context จาก ScaffoldMessenger.of() แทน
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
 
 // Helper Methods
