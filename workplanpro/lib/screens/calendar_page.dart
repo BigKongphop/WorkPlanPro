@@ -11,8 +11,13 @@ import '../services/activity_database.dart';
 
 class CalendarPage extends StatefulWidget {
   final String username;
+  final String userEmail;
 
-  const CalendarPage({Key? key, required this.username}) : super(key: key);
+  const CalendarPage({
+    Key? key,
+    required this.username,
+    required this.userEmail,
+  }) : super(key: key);
 
   @override
   _CalendarPageState createState() => _CalendarPageState();
@@ -239,40 +244,58 @@ class _CalendarPageState extends State<CalendarPage> {
         ],
         initialSelectedTab: "Calendar",
         tabIconColor: const Color(0xFF0C5217),
-        tabSelectedColor:
-            Colors.green, // เปลี่ยนสีพื้นหลังของไอเทมที่เลือกเป็นสีเขียว
+        tabSelectedColor: Colors.green,
         onTabItemSelected: (int index) {
+          setState(() {
+            _currentIndex = index;
+          });
           switch (index) {
             case 0:
               Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) =>
-                          HomePage(username: widget.username)));
+                context,
+                MaterialPageRoute(
+                  builder: (context) => HomePage(
+                    username: widget.username,
+                    userEmail: widget.userEmail,
+                  ),
+                ),
+              );
               break;
             case 1:
               Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) =>
-                          AccountPage(initialUsername: widget.username)));
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AccountPage(
+                    initialUsername: widget.username,
+                    userEmail: widget.userEmail,
+                  ),
+                ),
+              );
               break;
             case 2:
               Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) =>
-                          NotePage(username: widget.username)));
+                context,
+                MaterialPageRoute(
+                  builder: (context) => NotePage(
+                    username: widget.username,
+                    userEmail: widget.userEmail,
+                  ),
+                ),
+              );
               break;
             case 3:
-              // อยู่ที่หน้า Calendar อยู่แล้ว
+              // Already in Calendar page
               break;
             case 4:
               Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) =>
-                          GroupPage(username: widget.username)));
+                context,
+                MaterialPageRoute(
+                  builder: (context) => GroupPage(
+                    username: widget.username,
+                    userEmail: widget.userEmail,
+                  ),
+                ),
+              );
               break;
           }
         },
@@ -640,96 +663,5 @@ class _CalendarPageState extends State<CalendarPage> {
           b.startTime.minute -
           (a.startTime.hour * 60 + a.startTime.minute);
     });
-  }
-
-  Widget _buildBottomNavigationBar() {
-    return BottomNavigationBar(
-      currentIndex: _currentIndex,
-      onTap: (index) {
-        setState(() {
-          _currentIndex = index;
-        });
-        switch (index) {
-          case 0:
-            Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => HomePage(username: widget.username)));
-            break;
-          case 1:
-            Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                    builder: (context) =>
-                        AccountPage(initialUsername: widget.username)));
-            break;
-          case 2:
-            Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => NotePage(username: widget.username)));
-            break;
-          case 3:
-            break; // อยู่ที่หน้า Calendar อยู่แล้ว
-          case 4:
-            Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                    builder: (context) =>
-                        GroupPage(username: widget.username)));
-            break;
-        }
-      },
-      selectedItemColor: Colors.white,
-      unselectedItemColor: Color(0xFF0C5217),
-      backgroundColor: Colors.white,
-      type: BottomNavigationBarType.fixed,
-      items: [
-        BottomNavigationBarItem(
-          icon: _buildNavBarItem(Icons.home, 'Home', 0),
-          label: '',
-        ),
-        BottomNavigationBarItem(
-          icon: _buildNavBarItem(Icons.person, 'Account', 1),
-          label: '',
-        ),
-        BottomNavigationBarItem(
-          icon: _buildNavBarItem(Icons.book, 'Notes', 2),
-          label: '',
-        ),
-        BottomNavigationBarItem(
-          icon: _buildNavBarItem(Icons.calendar_today, 'Calendar', 3),
-          label: '',
-        ),
-        BottomNavigationBarItem(
-          icon: _buildNavBarItem(Icons.group, 'Groups', 4),
-          label: '',
-        ),
-      ],
-    );
-  }
-
-  Widget _buildNavBarItem(IconData icon, String label, int index) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(vertical: 5),
-      decoration: BoxDecoration(
-        color: _currentIndex == index ? Color(0xFF0C5217) : Colors.transparent,
-        borderRadius: BorderRadius.circular(0),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon,
-              color: _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
-          Text(
-            label,
-            style: TextStyle(
-                color:
-                    _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
-          )
-        ],
-      ),
-    );
   }
 }

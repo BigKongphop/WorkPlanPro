@@ -11,10 +11,12 @@ import '../services/note_database.dart';
 
 class NotePage extends StatefulWidget {
   final String username;
+  final String userEmail;
 
   const NotePage({
     Key? key,
     required this.username,
+    required this.userEmail,
   }) : super(key: key);
 
   @override
@@ -197,12 +199,11 @@ class _NotePageState extends State<NotePage> {
           Icons.person,
           Icons.book,
           Icons.calendar_today,
-          Icons.group,
+          Icons.group
         ],
         initialSelectedTab: "Notes",
         tabIconColor: const Color(0xFF0C5217),
-        tabSelectedColor:
-            Colors.green, // เปลี่ยนสีพื้นหลังของไอเทมที่เลือกเป็นสีเขียว
+        tabSelectedColor: Colors.green,
         onTabItemSelected: (int index) {
           setState(() {
             _currentIndex = index;
@@ -210,33 +211,50 @@ class _NotePageState extends State<NotePage> {
           switch (index) {
             case 0:
               Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) =>
-                          HomePage(username: widget.username)));
+                context,
+                MaterialPageRoute(
+                  builder: (context) => HomePage(
+                    username: widget.username,
+                    userEmail: widget.userEmail,
+                  ),
+                ),
+              );
               break;
             case 1:
               Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) =>
-                          AccountPage(initialUsername: widget.username)));
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AccountPage(
+                    initialUsername: widget.username,
+                    userEmail: widget.userEmail,
+                  ),
+                ),
+              );
               break;
             case 2:
+              // Already in Notes page
               break;
             case 3:
               Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) =>
-                          CalendarPage(username: widget.username)));
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CalendarPage(
+                    username: widget.username,
+                    userEmail: widget.userEmail,
+                  ),
+                ),
+              );
               break;
             case 4:
               Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) =>
-                          GroupPage(username: widget.username)));
+                context,
+                MaterialPageRoute(
+                  builder: (context) => GroupPage(
+                    username: widget.username,
+                    userEmail: widget.userEmail,
+                  ),
+                ),
+              );
               break;
           }
         },

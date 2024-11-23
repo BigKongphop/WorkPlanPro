@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -45,7 +44,11 @@ class ActivityModel {
 
 class HomePage extends StatefulWidget {
   final String username;
-  const HomePage({Key? key, required this.username}) : super(key: key);
+  final String userEmail;
+
+  const HomePage({Key? key, required this.username, required this.userEmail})
+      : super(key: key);
+
   @override
   _HomePageState createState() => _HomePageState();
 }
@@ -723,9 +726,7 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildBottomNavigationBar() {
     return MotionTabBar(
-      initialSelectedTab: 'Home',
-      useSafeArea: true,
-      labels: const ['Home', 'Account', 'Notes', 'Calendar', 'Groups'],
+      labels: const ["Home", "Account", "Notes", "Calendar", "Groups"],
       icons: const [
         Icons.home,
         Icons.person,
@@ -733,33 +734,72 @@ class _HomePageState extends State<HomePage>
         Icons.calendar_today,
         Icons.group
       ],
-      tabSelectedColor: Colors.green,
+      initialSelectedTab: "Home", // เปลี่ยนตาม page ที่กำลังแสดงอยู่
       tabIconColor: const Color(0xFF0C5217),
-      textStyle: const TextStyle(
-        color: Colors.green,
-        fontWeight: FontWeight.bold,
-      ),
-      onTabItemSelected: (index) {
+      tabSelectedColor: Colors.green,
+      onTabItemSelected: (int index) {
         setState(() {
           _currentIndex = index;
         });
 
         switch (index) {
-          case 0:
-            // Current page, do nothing
+          case 0: // Home
             break;
-          case 1:
-            safeNavigate(
-                context, AccountPage(initialUsername: widget.username));
+
+          case 1: // Account
+            if (!(this is AccountPage)) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AccountPage(
+                    initialUsername: widget.username,
+                    userEmail: widget.userEmail,
+                  ),
+                ),
+              );
+            }
             break;
-          case 2:
-            safeNavigate(context, NotePage(username: widget.username));
+
+          case 2: // Notes
+            if (!(this is NotePage)) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => NotePage(
+                    username: widget.username,
+                    userEmail: widget.userEmail,
+                  ),
+                ),
+              );
+            }
             break;
-          case 3:
-            safeNavigate(context, CalendarPage(username: widget.username));
+
+          case 3: // Calendar
+            if (!(this is CalendarPage)) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CalendarPage(
+                    username: widget.username,
+                    userEmail: widget.userEmail,
+                  ),
+                ),
+              );
+            }
             break;
-          case 4:
-            safeNavigate(context, GroupPage(username: widget.username));
+
+          case 4: // Groups
+            if (!(this is GroupPage)) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => GroupPage(
+                    username: widget.username,
+                    userEmail: widget.userEmail,
+                  ),
+                ),
+              );
+            }
             break;
         }
       },

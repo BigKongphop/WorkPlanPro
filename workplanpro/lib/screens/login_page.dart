@@ -1635,8 +1635,14 @@ class _LoginPageState extends State<LoginPage>
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) =>
-              HomePage(username: email),
+          pageBuilder: (context, animation, secondaryAnimation) {
+            final user = FirebaseAuth.instance.currentUser;
+            return HomePage(
+              username: email!,
+              userEmail: user?.email ??
+                  '', // ใช้ email จาก Firebase Auth หรือ empty string ถ้าไม่มี
+            );
+          },
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             const begin = Offset(0.0, 1.0); // เริ่มจากด้านล่าง
             const end = Offset.zero; // ไปยังตำแหน่งปัจจุบัน

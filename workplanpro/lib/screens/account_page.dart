@@ -292,10 +292,14 @@ class UserProfileNotifier extends ValueNotifier<Map<String, dynamic>?> {
 
 class AccountPage extends StatefulWidget {
   final String initialUsername;
+  final String userEmail;
   final Map<String, dynamic>? initialUserData;
 
   const AccountPage(
-      {Key? key, required this.initialUsername, this.initialUserData})
+      {Key? key,
+      required this.initialUsername,
+      this.initialUserData,
+      required this.userEmail})
       : super(key: key);
 
   @override
@@ -1321,7 +1325,11 @@ class _AccountPageState extends State<AccountPage> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => AccountPage(initialUsername: _currentUsername),
+        builder: (context) => AccountPage(
+          initialUsername: _currentUsername,
+          userEmail: FirebaseAuth.instance.currentUser?.email ??
+              '',
+        ),
       ),
     );
   }
@@ -1773,9 +1781,7 @@ class _AccountPageState extends State<AccountPage> {
 
   Widget _buildBottomNavigationBar() {
     return MotionTabBar(
-      initialSelectedTab: 'Account',
-      useSafeArea: true,
-      labels: const ['Home', 'Account', 'Notes', 'Calendar', 'Groups'],
+      labels: const ["Home", "Account", "Notes", "Calendar", "Groups"],
       icons: const [
         Icons.home,
         Icons.person,
@@ -1783,51 +1789,72 @@ class _AccountPageState extends State<AccountPage> {
         Icons.calendar_today,
         Icons.group
       ],
-      tabSelectedColor: Colors.green,
+      initialSelectedTab: "Account", // เปลี่ยนตาม page ที่กำลังแสดงอยู่
       tabIconColor: const Color(0xFF0C5217),
-      textStyle: const TextStyle(
-        color: Colors.green,
-        fontWeight: FontWeight.bold,
-      ),
-      onTabItemSelected: (index) {
+      tabSelectedColor: Colors.green,
+      onTabItemSelected: (int index) {
         setState(() {
           _currentIndex = index;
         });
 
         switch (index) {
-          case 0:
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => HomePage(username: _currentUsername),
-              ),
-            );
+          case 0: // Home
+            if (!(this is HomePage)) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => HomePage(
+                    username: widget.initialUsername,
+                    userEmail: widget.userEmail,
+                  ),
+                ),
+              );
+            }
             break;
-          case 1:
-            break; // Current page
-          case 2:
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => NotePage(username: _currentUsername),
-              ),
-            );
+
+          case 1: // Account
             break;
-          case 3:
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CalendarPage(username: _currentUsername),
-              ),
-            );
+
+          case 2: // Notes
+            if (!(this is NotePage)) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => NotePage(
+                    username: widget.initialUsername,
+                    userEmail: widget.userEmail,
+                  ),
+                ),
+              );
+            }
             break;
-          case 4:
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => GroupPage(username: _currentUsername),
-              ),
-            );
+
+          case 3: // Calendar
+            if (!(this is CalendarPage)) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CalendarPage(
+                    username: widget.initialUsername,
+                    userEmail: widget.userEmail,
+                  ),
+                ),
+              );
+            }
+            break;
+
+          case 4: // Groups
+            if (!(this is GroupPage)) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => GroupPage(
+                    username: widget.initialUsername,
+                    userEmail: widget.userEmail,
+                  ),
+                ),
+              );
+            }
             break;
         }
       },

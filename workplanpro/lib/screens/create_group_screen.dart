@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:path/path.dart' as path;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -8,10 +7,12 @@ import './choose_group_image_screen.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   final String currentUsername;
+  final String currentEmail;
 
   const CreateGroupScreen({
     Key? key,
     required this.currentUsername,
+    required this.currentEmail,
   }) : super(key: key);
 
   @override
@@ -28,15 +29,16 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
   Future<String?> _uploadImage() async {
     if (_selectedImage == null) return null;
-    
+
     try {
       if (_selectedImage is File) {
         final File imageFile = _selectedImage as File;
-        final String fileName = path.basename(imageFile.path);
+        final String fileName =
+            DateTime.now().millisecondsSinceEpoch.toString() + '.jpg';
         final Reference storageRef = FirebaseStorage.instance
             .ref()
             .child('group_images')
-            .child('${DateTime.now().millisecondsSinceEpoch}_$fileName');
+            .child(fileName);
 
         final UploadTask uploadTask = storageRef.putFile(imageFile);
         final TaskSnapshot snapshot = await uploadTask;
@@ -46,6 +48,11 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       }
     } catch (e) {
       print('Error uploading image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading image: $e')),
+        );
+      }
       return null;
     }
     return null;
@@ -60,25 +67,60 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     });
 
     try {
+      final existingGroups = await FirebaseFirestore.instance
+          .collection('groups')
+          .where('name', isEqualTo: _nameController.text.trim())
+          .get();
+
+      if (existingGroups.docs.isNotEmpty) {
+        setState(() {
+          _isLoading = false;
+          _nameError = 'Group name already exists';
+        });
+        return;
+      }
+
       final String? imageUrl = await _uploadImage();
-      
-      await FirebaseFirestore.instance.collection('groups').add({
+
+      final batch = FirebaseFirestore.instance.batch();
+      final groupRef = FirebaseFirestore.instance.collection('groups').doc();
+
+      // Add group document with memberEmails array
+      batch.set(groupRef, {
         'name': _nameController.text.trim(),
         'description': _descriptionController.text.trim(),
+        'creatorEmail': widget.currentEmail,
         'creatorName': widget.currentUsername,
         'createdAt': FieldValue.serverTimestamp(),
-        'members': [widget.currentUsername],
+        'memberCount': 1,
         'imageUrl': imageUrl ?? '',
+        'memberEmails': [widget.currentEmail], // Add memberEmails array
       });
 
-      if (!mounted) return;
-      Navigator.pop(context, true);
-      
+      // Add creator as admin member
+      final memberRef = groupRef.collection('members').doc();
+      batch.set(memberRef, {
+        'email': widget.currentEmail,
+        'role': 'admin',
+        'joinedAt': FieldValue.serverTimestamp(),
+        'status': 'accepted'
+      });
+
+      await batch.commit();
+
+      if (mounted) {
+        Navigator.pop(context, true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Group created successfully')),
+        );
+      }
     } catch (e) {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error creating group: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error creating group: $e')),
+        );
+      }
     }
   }
 
@@ -109,7 +151,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
           SnackBar(content: Text('Error selecting image: $e')),
         );
       }
-      print('Error in _showImagePicker: $e');
     }
   }
 
@@ -122,6 +163,10 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         title: const Text(
           'Create New Group',
           style: TextStyle(color: Colors.white),
+        ),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
         ),
       ),
       body: SingleChildScrollView(
@@ -152,7 +197,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                             : null,
                       ),
                       child: _selectedImage == null
-                          ? const Icon(
+                          ? Icon(
                               Icons.add_photo_alternate,
                               size: 40,
                               color: Colors.grey,
@@ -161,7 +206,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
@@ -170,6 +215,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
+                    prefixIcon: Icon(Icons.group),
                   ),
                   validator: (value) {
                     if (value?.trim().isEmpty ?? true) {
@@ -178,7 +224,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 TextFormField(
                   controller: _descriptionController,
                   maxLines: 3,
@@ -187,9 +233,10 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
+                    prefixIcon: Icon(Icons.description),
                   ),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -202,7 +249,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                       ),
                     ),
                     child: _isLoading
-                        ? const SizedBox(
+                        ? SizedBox(
                             height: 20,
                             width: 20,
                             child: CircularProgressIndicator(
@@ -211,7 +258,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                                   AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
-                        : const Text(
+                        : Text(
                             'Create Group',
                             style: TextStyle(
                               fontSize: 16,
