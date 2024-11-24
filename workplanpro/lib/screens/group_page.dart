@@ -11,13 +11,14 @@ import '../widgets/group_invite_notifications.dart';
 
 class GroupPage extends StatefulWidget {
   final String username;
-  final String userEmail;
+  final String userEmail; // Add this line
 
-  const GroupPage({
-    Key? key,
-    required this.username,
-    required this.userEmail,
-  }) : super(key: key);
+  const GroupPage(
+      {Key? key,
+      required this.username,
+      required this.userEmail // Add this parameter
+      })
+      : super(key: key);
 
   @override
   _GroupPageState createState() => _GroupPageState();

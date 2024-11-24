@@ -9,15 +9,17 @@ import 'add_activity_screen.dart';
 import '../models/activity.dart';
 import '../services/activity_database.dart';
 
+// CalendarPage
 class CalendarPage extends StatefulWidget {
   final String username;
-  final String userEmail;
+  final String userEmail; // Add this line
 
-  const CalendarPage({
-    Key? key,
-    required this.username,
-    required this.userEmail,
-  }) : super(key: key);
+  const CalendarPage(
+      {Key? key,
+      required this.username,
+      required this.userEmail // Add this parameter
+      })
+      : super(key: key);
 
   @override
   _CalendarPageState createState() => _CalendarPageState();

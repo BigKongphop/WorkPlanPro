@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
 import 'package:lottie/lottie.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -292,15 +293,15 @@ class UserProfileNotifier extends ValueNotifier<Map<String, dynamic>?> {
 
 class AccountPage extends StatefulWidget {
   final String initialUsername;
-  final String userEmail;
   final Map<String, dynamic>? initialUserData;
+  final String userEmail;
 
-  const AccountPage(
-      {Key? key,
-      required this.initialUsername,
-      this.initialUserData,
-      required this.userEmail})
-      : super(key: key);
+  const AccountPage({
+    Key? key,
+    required this.initialUsername,
+    this.initialUserData,
+    required this.userEmail,
+  }) : super(key: key);
 
   @override
   _AccountPageState createState() => _AccountPageState();
@@ -342,6 +343,7 @@ class AccountPageManager {
 
 class _AccountPageState extends State<AccountPage> {
   Map<String, dynamic>? userData;
+  String _userEmail = '';
   bool isLoading = true;
   bool isError = false;
   String errorMessage = '';
@@ -361,12 +363,16 @@ class _AccountPageState extends State<AccountPage> {
   // เพิ่มการประกาศตัวแปรสำหรับการล็อกอิน
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-
   @override
   void initState() {
     super.initState();
     _currentUsername = widget.initialUsername;
-
+    userData = widget.initialUserData;
+    // Set userEmail from multiple possible sources
+    _userEmail = FirebaseAuth.instance.currentUser?.email ??
+        userData?['email'] ??
+        widget.userEmail ??
+        '';
     // โหลดข้อมูลผู้ใช้
     _loadUserData();
 
@@ -389,14 +395,29 @@ class _AccountPageState extends State<AccountPage> {
   void _editProfile() async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => EditProfilePage(userData: userData!),
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            EditProfilePage(userData: userData!),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(1.0, 0.0); // เข้าจากด้านขวา
+          const end = Offset.zero;
+          const curve = Curves.easeInOut;
+
+          var tween =
+              Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+          var offsetAnimation = animation.drive(tween);
+
+          return SlideTransition(
+            position: offsetAnimation,
+            child: child,
+          );
+        },
       ),
     );
 
     // ตรวจสอบผลลัพธ์และโหลดข้อมูลใหม่
     if (result == true) {
-      await _loadUserData();
+      await _loadUserData(); // โหลดข้อมูลใหม่เมื่อกลับมา
     }
   }
 
@@ -458,12 +479,12 @@ class _AccountPageState extends State<AccountPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('บัญชีของฉัน'),
+        title: Text('My Account'), // Changed from 'บัญชีของฉัน'
         actions: [
           IconButton(
             icon: Icon(Icons.edit),
             onPressed: _editProfile,
-            tooltip: 'แก้ไขโปรไฟล์',
+            tooltip: 'Edit Profile', // Changed from 'แก้ไขโปรไฟล์'
           )
         ],
       ),
@@ -486,7 +507,7 @@ class _AccountPageState extends State<AccountPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'ข้อมูลเพิ่มเติม',
+                'Additional Information', // Changed from 'ข้อมูลเพิ่มเติม'
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -496,13 +517,13 @@ class _AccountPageState extends State<AccountPage> {
               SizedBox(height: 16),
               _buildInfoRow(
                 icon: Icons.calendar_today,
-                title: 'วันที่สมัคร',
+                title: 'Registration Date', // Changed from 'วันที่สมัคร'
                 value: _formatDate(userData?['createdAt']),
               ),
               Divider(),
               _buildInfoRow(
                 icon: Icons.update,
-                title: 'อัปเดตล่าสุด',
+                title: 'Last Updated', // Changed from 'อัปเดตล่าสุด'
                 value: _formatDate(userData?['lastUpdated']),
               ),
             ],
@@ -597,7 +618,7 @@ class _AccountPageState extends State<AccountPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'การดำเนินการด่วน',
+                'Quick Actions', // Changed from 'การดำเนินการด่วน'
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -606,22 +627,9 @@ class _AccountPageState extends State<AccountPage> {
               ),
               SizedBox(height: 16),
               ElevatedButton.icon(
-                onPressed: _changeProfileImage,
-                icon: Icon(Icons.camera_alt),
-                label: Text('เปลี่ยนรูปโปรไฟล์'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade600,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-              SizedBox(height: 10),
-              ElevatedButton.icon(
                 onPressed: _editUsername,
                 icon: Icon(Icons.edit),
-                label: Text('แก้ไขชื่อผู้ใช้'),
+                label: Text('Edit Username'), // Changed from 'แก้ไขชื่อผู้ใช้'
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green.shade600,
                   foregroundColor: Colors.white,
@@ -634,7 +642,7 @@ class _AccountPageState extends State<AccountPage> {
               ElevatedButton.icon(
                 onPressed: _handleLogout,
                 icon: Icon(Icons.logout),
-                label: Text('ออกจากระบบ'),
+                label: Text('Logout'), // Changed from 'ออกจากระบบ'
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red.shade600,
                   foregroundColor: Colors.white,
@@ -659,6 +667,8 @@ class _AccountPageState extends State<AccountPage> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
+        borderRadius:
+            BorderRadius.vertical(bottom: Radius.circular(30)), // มุมมน
       ),
       child: Column(
         children: [
@@ -668,11 +678,10 @@ class _AccountPageState extends State<AccountPage> {
             userData?['username'] ?? 'ชื่อผู้ใช้',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 22,
+              fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
           ),
-          // ดึงอีเมลจาก Firebase Authentication
           Text(
             FirebaseAuth.instance.currentUser?.email ?? 'อีเมล',
             style: TextStyle(
@@ -700,13 +709,13 @@ class _AccountPageState extends State<AccountPage> {
             children: [
               _buildDetailRow(
                 icon: Icons.phone,
-                title: 'เบอร์โทรศัพท์',
+                title: 'Phone Number',
                 value: userData?['phone'] ?? 'ยังไม่ได้เพิ่ม',
               ),
               Divider(),
               _buildDetailRow(
                 icon: Icons.location_on,
-                title: 'ที่อยู่',
+                title: 'Address',
                 value: userData?['address'] ?? 'ยังไม่ได้เพิ่ม',
               ),
             ],
@@ -941,68 +950,128 @@ class _AccountPageState extends State<AccountPage> {
     }
   }
 
-  Future<void> _changeProfileImage() async {
-    showModalBottomSheet(
+  /*Future<void> _changeProfileImage() async {
+    await showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Wrap(
-            children: <Widget>[
-              ListTile(
-                leading: const Icon(Icons.photo_camera),
-                title: const Text('ถ่ายภาพ'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  String? uploadedUrl =
-                      await _pickAndUpdateProfileImage(ImageSource.camera);
-
-                  if (uploadedUrl != null) {
-                    setState(() {
-                      _profileImageUrl = uploadedUrl;
-                      if (userData != null) {
-                        userData!['profileImageUrl'] = uploadedUrl;
-                      }
-                    });
-                    // แสดง Snackbar เมื่ออัปโหลดสำเร็จ
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('อัปเดตรูปโปรไฟล์สำเร็จ'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: const Text('เลือกจากคลังภาพ'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  String? uploadedUrl =
-                      await _pickAndUpdateProfileImage(ImageSource.gallery);
-
-                  if (uploadedUrl != null) {
-                    setState(() {
-                      _profileImageUrl = uploadedUrl;
-                      if (userData != null) {
-                        userData!['profileImageUrl'] = uploadedUrl;
-                      }
-                    });
-                    // แสดง Snackbar เมื่ออัปโหลดสำเร็จ
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('อัปเดตรูปโปรไฟล์สำเร็จ'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                },
-              ),
-            ],
-          ),
-        );
-      },
+      builder: (context) => AlertDialog(
+        title: const Text('เลือกรูปโปรไฟล์'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('ถ่ายรูป'),
+              onTap: () {
+                Navigator.of(context).pop(); // ปิด Dialog
+                _pickProfileImage(
+                    ImageSource.camera); // เรียกฟังก์ชันเลือกภาพจากกล้อง
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('เลือกจากคลังภาพ'),
+              onTap: () {
+                Navigator.of(context).pop(); // ปิด Dialog
+                _pickProfileImage(
+                    ImageSource.gallery); // เรียกฟังก์ชันเลือกภาพจากคลัง
+              },
+            ),
+          ],
+        ),
+      ),
     );
+  }*/
+
+  Future<void> _pickProfileImage(ImageSource source) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: source,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 75,
+      );
+
+      if (image != null) {
+        // บันทึกรูปภาพลงในเครื่อง
+        final directory = await getApplicationDocumentsDirectory();
+        final fileName =
+            'profile_image_${DateTime.now().millisecondsSinceEpoch}.png';
+        final savedImage =
+            await File(image.path).copy('${directory.path}/$fileName');
+
+        // อัปโหลดรูปภาพ
+        await _uploadProfileImage(savedImage);
+      }
+    } catch (e) {
+      print('เกิดข้อผิดพลาดในการเลือกรูปภาพ: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
+      );
+    }
+  }
+
+  Future<void> _uploadProfileImage(File imageFile) async {
+    try {
+      User? currentUser = FirebaseAuth.instance.currentUser;
+
+      if (currentUser == null) {
+        throw Exception('User not found');
+      }
+
+      // แสดง Loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+          ),
+        ),
+      );
+
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('profile_images')
+          .child('${currentUser.uid}.jpg');
+
+      await storageRef.putFile(imageFile);
+
+      final imageUrl = await storageRef.getDownloadURL();
+
+      // อัปเดต Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .update({
+        'profileImageUrl': imageUrl,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+
+      // ปิด Loading
+      Navigator.of(context).pop();
+
+      // โหลดข้อมูลใหม่
+      await _loadUserData();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('อัปเดตรูปโปรไฟล์สำเร็จ'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      // ปิด Loading
+      Navigator.of(context).pop();
+
+      print('Error uploading image: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<String?> _pickAndUpdateProfileImage(ImageSource source) async {
@@ -1078,51 +1147,6 @@ class _AccountPageState extends State<AccountPage> {
         duration: const Duration(seconds: 3),
       ),
     );
-  }
-
-  Future<void> _uploadProfileImage(File imageFile) async {
-    try {
-      User? currentUser = FirebaseAuth.instance.currentUser;
-
-      if (currentUser == null) {
-        throw Exception('User  not found');
-      }
-
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('profile_images')
-          .child('${currentUser.uid}.jpg');
-
-      await storageRef.putFile(imageFile);
-
-      final imageUrl = await storageRef.getDownloadURL();
-
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .update({
-        'profileImageUrl': imageUrl,
-      });
-
-      setState(() {
-        _profileImageUrl = imageUrl; // อัปเดต _profileImageUrl
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile image uploaded successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      print('Error uploading image: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
   }
 
   Future<void> _editUsername() async {
@@ -1322,13 +1346,19 @@ class _AccountPageState extends State<AccountPage> {
   }
 
   void _updateNavigationWithNewUsername() {
+    // Get email from multiple possible sources
+    String userEmail = FirebaseAuth.instance.currentUser?.email ??
+        userData?['email'] ??
+        widget.userEmail ??
+        '';
+
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
         builder: (context) => AccountPage(
           initialUsername: _currentUsername,
-          userEmail: FirebaseAuth.instance.currentUser?.email ??
-              '',
+          initialUserData: userData, // Provide initialUserData here
+          userEmail: userEmail, // Use the retrieved email
         ),
       ),
     );
@@ -1374,6 +1404,17 @@ class _AccountPageState extends State<AccountPage> {
       );
     }
 
+    // ตรวจสอบว่าเป็นพาธของไฟล์หรือ URL
+    if (userData['profileImageUrl'].startsWith('/') ||
+        userData['profileImageUrl'].startsWith('file://')) {
+      // กรณีเป็นพาธของไฟล์ใน local
+      return CircleAvatar(
+        radius: 80,
+        backgroundImage: FileImage(File(userData['profileImageUrl'])),
+      );
+    }
+
+    // กรณีเป็น URL จาก Firebase (เดิม)
     return CachedNetworkImage(
       imageUrl: userData['profileImageUrl'],
       imageBuilder: (context, imageProvider) => CircleAvatar(
@@ -1389,9 +1430,8 @@ class _AccountPageState extends State<AccountPage> {
       ),
       errorWidget: (context, url, error) => CircleAvatar(
         radius: 80,
-        backgroundColor: Colors.green.shade100, // สีพื้นหลังเมื่อเกิดข้อผิดพลาด
-        child: Icon(Icons.person,
-            size: 80, color: Colors.green.shade800), // ไอคอนแทนที่
+        backgroundColor: Colors.green.shade100,
+        child: Icon(Icons.person, size: 80, color: Colors.green.shade800),
       ),
     );
   }
@@ -1629,7 +1669,7 @@ class _AccountPageState extends State<AccountPage> {
           _buildAdditionalInfoSection(),
           _buildQuickActionButtons(),
           // เพิ่มปุ่มรีเฟรชข้อมูล
-          Padding(
+          /*Padding(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: ElevatedButton.icon(
               onPressed: _loadUserData,
@@ -1640,7 +1680,7 @@ class _AccountPageState extends State<AccountPage> {
                 foregroundColor: Colors.white,
               ),
             ),
-          ),
+          ),*/
         ],
       ),
     );
@@ -1702,13 +1742,13 @@ class _AccountPageState extends State<AccountPage> {
             Icon(Icons.person_off, size: 100, color: Colors.grey),
             SizedBox(height: 16),
             Text(
-              'ไม่พบข้อมูลผู้ใช้',
+              'User data not found',
               style: TextStyle(fontSize: 18, color: Colors.grey),
             ),
             SizedBox(height: 16),
             ElevatedButton(
               onPressed: _loadUserData,
-              child: Text('โหลดข้อมูลอีกครั้ง'),
+              child: Text('Reload Data'),
             )
           ],
         ),
@@ -1722,16 +1762,16 @@ class _AccountPageState extends State<AccountPage> {
         children: [
           _buildProfileImage(userData),
           const SizedBox(height: 24),
-          _buildInfoCard('ชื่อผู้ใช้', userData['username'] ?? 'ไม่มีข้อมูล',
+          _buildInfoCard('Username', userData['username'] ?? 'No information',
               Icons.person),
           const SizedBox(height: 16),
           _buildInfoCard(
-              'อีเมล', userData['email'] ?? 'ไม่มีข้อมูล', Icons.email),
+              'Email', userData['email'] ?? 'No information', Icons.email),
           const SizedBox(height: 16),
-          _buildInfoCard(
-              'เบอร์โทรศัพท์', userData['phone'] ?? 'ไม่มีข้อมูล', Icons.phone),
+          _buildInfoCard('Phone Number', userData['phone'] ?? 'No information',
+              Icons.phone),
           const SizedBox(height: 16),
-          _buildInfoCard('ที่อยู่', userData['address'] ?? 'ไม่มีข้อมูล',
+          _buildInfoCard('Address', userData['address'] ?? 'No information',
               Icons.location_on),
         ],
       ),
@@ -1781,7 +1821,9 @@ class _AccountPageState extends State<AccountPage> {
 
   Widget _buildBottomNavigationBar() {
     return MotionTabBar(
-      labels: const ["Home", "Account", "Notes", "Calendar", "Groups"],
+      initialSelectedTab: 'Account',
+      useSafeArea: true,
+      labels: const ['Home', 'Account', 'Notes', 'Calendar', 'Groups'],
       icons: const [
         Icons.home,
         Icons.person,
@@ -1789,72 +1831,69 @@ class _AccountPageState extends State<AccountPage> {
         Icons.calendar_today,
         Icons.group
       ],
-      initialSelectedTab: "Account", // เปลี่ยนตาม page ที่กำลังแสดงอยู่
-      tabIconColor: const Color(0xFF0C5217),
       tabSelectedColor: Colors.green,
-      onTabItemSelected: (int index) {
+      tabIconColor: const Color(0xFF0C5217),
+      textStyle: const TextStyle(
+        color: Colors.green,
+        fontWeight: FontWeight.bold,
+      ),
+      onTabItemSelected: (index) {
         setState(() {
           _currentIndex = index;
         });
 
+        // Get email from Firebase Auth or userData
+        String userEmail = FirebaseAuth.instance.currentUser?.email ??
+            userData?['email'] ??
+            widget.userEmail ??
+            '';
+
         switch (index) {
-          case 0: // Home
-            if (!(this is HomePage)) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => HomePage(
-                    username: widget.initialUsername,
-                    userEmail: widget.userEmail,
-                  ),
+          case 0:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HomePage(
+                  username: _currentUsername,
+                  userEmail: userEmail,
                 ),
-              );
-            }
+              ),
+            );
             break;
-
-          case 1: // Account
-            break;
-
-          case 2: // Notes
-            if (!(this is NotePage)) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => NotePage(
-                    username: widget.initialUsername,
-                    userEmail: widget.userEmail,
-                  ),
+          case 1:
+            break; // Current page
+          case 2:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => NotePage(
+                  username: _currentUsername,
+                  userEmail: userEmail,
                 ),
-              );
-            }
+              ),
+            );
             break;
-
-          case 3: // Calendar
-            if (!(this is CalendarPage)) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CalendarPage(
-                    username: widget.initialUsername,
-                    userEmail: widget.userEmail,
-                  ),
+          case 3:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CalendarPage(
+                  username: _currentUsername,
+                  userEmail: userEmail,
                 ),
-              );
-            }
+              ),
+            );
             break;
-
-          case 4: // Groups
-            if (!(this is GroupPage)) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => GroupPage(
-                    username: widget.initialUsername,
-                    userEmail: widget.userEmail,
-                  ),
+          case 4:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => GroupPage(
+                  username: _currentUsername,
+                  userEmail: userEmail,
                 ),
-              );
-            }
+              ),
+            );
             break;
         }
       },

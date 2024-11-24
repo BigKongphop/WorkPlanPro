@@ -138,6 +138,7 @@ class _LoginPageState extends State<LoginPage>
   final _processingMutex = Lock();
   final FocusNode _usernameFocusNode = FocusNode();
   final FocusNode _passwordFocusNode = FocusNode();
+  bool _rememberMe = false;
 
   Future<void> _completeAppReset() async {
     try {
@@ -209,13 +210,24 @@ class _LoginPageState extends State<LoginPage>
       });
 
       try {
-        if (!_validateInputs()) return;
-
         UserCredential userCredential =
             await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: _usernameController.text.trim(),
           password: _passwordController.text.trim(),
         );
+
+        // บันทึกข้อมูลถ้าผู้ใช้เลือก "Remember Me"
+        final prefs = await SharedPreferences.getInstance();
+        if (_rememberMe) {
+          await prefs.setBool('remember_me', true);
+          await prefs.setString('email', _usernameController.text.trim());
+          await prefs.setString('password', _passwordController.text.trim());
+        } else {
+          // ถ้าไม่เลือก Remember Me ให้ล้างข้อมูล
+          await prefs.remove('remember_me');
+          await prefs.remove('email');
+          await prefs.remove('password');
+        }
 
         // ตรวจสอบว่าผู้ใช้ล็อกอินสำเร็จหรือไม่
         await _handleUserAfterLogin(userCredential);
@@ -696,6 +708,12 @@ class _LoginPageState extends State<LoginPage>
       // ล้างข้อมูลผู้ใช้
       await _clearUserData();
 
+      // ล้าง SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('remember_me');
+      await prefs.remove('email');
+      await prefs.remove('password');
+
       // นำทางไปยังหน้า Login
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => LoginPage()),
@@ -725,9 +743,30 @@ class _LoginPageState extends State<LoginPage>
 
   Future<void> _checkPreviousLogin() async {
     final prefs = await SharedPreferences.getInstance();
-    final savedEmail = prefs.getString('email');
-    if (savedEmail != null) {
-      _usernameController.text = savedEmail;
+
+    // ตรวจสอบว่ามีการเลือก "Remember Me" ในครั้งก่อนหรือไม่
+    bool rememberMeEnabled = prefs.getBool('remember_me') ?? false;
+
+    if (rememberMeEnabled) {
+      // ดึง email และ password เฉพาะเมื่อ Remember Me เปิดอยู่
+      final savedEmail = prefs.getString('email');
+      final savedPassword = prefs.getString('password');
+
+      if (savedEmail != null) {
+        _usernameController.text = savedEmail;
+      }
+
+      if (savedPassword != null) {
+        _passwordController.text = savedPassword;
+      }
+    } else {
+      // ถ้าไม่ได้เลือก Remember Me ให้ล้างข้อมูลเก่า
+      await prefs.remove('email');
+      await prefs.remove('password');
+
+      // ล้าง TextField
+      _usernameController.clear();
+      _passwordController.clear();
     }
   }
 
@@ -1635,14 +1674,10 @@ class _LoginPageState extends State<LoginPage>
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) {
-            final user = FirebaseAuth.instance.currentUser;
-            return HomePage(
-              username: email!,
-              userEmail: user?.email ??
-                  '', // ใช้ email จาก Firebase Auth หรือ empty string ถ้าไม่มี
-            );
-          },
+          pageBuilder: (context, animation, secondaryAnimation) => HomePage(
+            username: email,
+            userEmail: email, // Add this line
+          ),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             const begin = Offset(0.0, 1.0); // เริ่มจากด้านล่าง
             const end = Offset.zero; // ไปยังตำแหน่งปัจจุบัน
@@ -1718,6 +1753,22 @@ class _LoginPageState extends State<LoginPage>
                     focusNode: _passwordFocusNode,
                     onSubmitted: (_) => _handleLogin(),
                   ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _rememberMe,
+                        onChanged: (value) {
+                          setState(() {
+                            _rememberMe = value!;
+                          });
+                        },
+                      ),
+                      const Text('Remember Me'),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  _buildForgotPasswordLink(), // เพิ่มลิงค์ลืมรหัสผ่าน
                   const SizedBox(height: 30),
                   _buildLoginButton(),
                   const SizedBox(height: 20),

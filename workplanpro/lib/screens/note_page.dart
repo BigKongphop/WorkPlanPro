@@ -11,13 +11,14 @@ import '../services/note_database.dart';
 
 class NotePage extends StatefulWidget {
   final String username;
-  final String userEmail;
+  final String userEmail; // Add this line
 
-  const NotePage({
-    Key? key,
-    required this.username,
-    required this.userEmail,
-  }) : super(key: key);
+  const NotePage(
+      {Key? key,
+      required this.username,
+      required this.userEmail // Add this parameter
+      })
+      : super(key: key);
 
   @override
   _NotePageState createState() => _NotePageState();

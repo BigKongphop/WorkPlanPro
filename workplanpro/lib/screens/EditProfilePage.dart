@@ -10,10 +10,12 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:email_validator/email_validator.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:workplanpro/screens/login_page.dart';
+import 'package:http/http.dart' as http;
 
 class FirebaseService {
   static Future<Map<String, dynamic>> fetchUserData() async {
@@ -309,6 +311,8 @@ class _EditProfilePageState extends State<EditProfilePage>
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _isEmailVerified = false;
   String _emailVerificationStatus = '';
+
+  String? _profileImagePath;
   final ThemeData appTheme = ThemeData(
       primarySwatch: Colors.green,
       fontFamily: 'Prompt', // ฟอนต์ที่อ่านง่าย
@@ -334,20 +338,23 @@ class _EditProfilePageState extends State<EditProfilePage>
     WidgetsBinding.instance.addObserver(this);
     _initializeControllers();
     _setupAnimations();
-    _fetchInitialUserData();
+    _fetchInitialUserData(); // เรียกใช้เพื่อโหลดข้อมูลผู้ใช้ก่อน
     _listenForEmailChange();
+    _setupConnectivityListener(); // เรียกใช้งานเพื่อโหลดข้อมูลการเชื่อมต่อ
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // ลงทะเบียน WillPopScope หรือใช้การดักจับการออกจากหน้าแบบอื่น
-      // เช่น Navigator.of(context).popUntil() หรือ Navigator.of(context).pop()
+      _loadProfileImageFromFirestore(); // โหลดรูปโปรไฟล์จาก Firestore
+      _setupChangeListeners(); // ตั้งค่าการฟังการเปลี่ยนแปลง
+      _initializePage(); // เรียกใช้เพื่อเริ่มต้นหน้า
     });
-    _setupConnectivityListener();
-    _initializeData();
-    _setupChangeListeners();
-    // Delay the setup of change listeners to ensure all data is loaded
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializePage();
-    });
-  } // เพิ่มเมธอดติดตามสถานะการเชื่อมต่อ
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // โหลดรูปโปรไฟล์จาก Firestore ทุกครั้งเมื่อ dependencies เปลี่ยนแปลง
+    _loadProfileImageFromFirestore();
+  }
 
   void _setupConnectivityListener() {
     _connectivitySubscription = Connectivity()
@@ -366,6 +373,82 @@ class _EditProfilePageState extends State<EditProfilePage>
       }
     });
   } // โหลดข้อมูลเริ่มต้นแบบปลอดภัย
+
+  Future<void> _loadProfileImageFromFirestore() async {
+    try {
+      // ดึงข้อมูลผู้ใช้ปัจจุบัน
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      // ดึงเอกสารผู้ใช้จาก Firestore
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (userDoc.exists) {
+        final profileImageUrl = userDoc.data()?['profileImageUrl'];
+
+        if (profileImageUrl != null) {
+          setState(() {
+            _profileImageUrl = profileImageUrl;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading profile image: $e');
+    }
+  }
+
+  Future<void> _saveNetworkImageToLocal(String imageUrl) async {
+    try {
+      // ดาวน์โหลดรูปภาพ
+      final response = await http.get(Uri.parse(imageUrl));
+
+      if (response.statusCode == 200) {
+        // สร้างไดเรกทอรีสำหรับบันทึกรูปภาพ
+        final directory = await getApplicationDocumentsDirectory();
+        final imagePath = '${directory.path}/profile_image.png';
+
+        // บันทึกรูปภาพลงในเครื่อง
+        final File imageFile = File(imagePath);
+        await imageFile.writeAsBytes(response.bodyBytes);
+
+        setState(() {
+          _profileImagePath = imagePath;
+        });
+      }
+    } catch (e) {
+      print('Error saving network image locally: $e');
+    }
+  }
+
+  // เพิ่มฟังก์ชันโหลดรูปภาพ
+  Future<void> _loadProfileImage() async {
+    try {
+      // ดึง path รูปภาพจาก SharedPreferences หรือ Firestore
+      String? savedImagePath = await _getSavedImagePath();
+
+      if (savedImagePath != null) {
+        final File imageFile = File(savedImagePath);
+
+        if (imageFile.existsSync()) {
+          setState(() {
+            _profileImagePath = savedImagePath;
+          });
+        } else {
+          print('Saved image file does not exist');
+        }
+      }
+    } catch (e) {
+      print('Error loading profile image: $e');
+    }
+  } // เพิ่มฟังก์ชันดึง path รูปภาพที่บันทึกไว้
+
+  Future<String?> _getSavedImagePath() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getString('profile_image_path');
+  }
 
   Future<void> _initializeData() async {
     if (_isDisposed) return;
@@ -405,25 +488,48 @@ class _EditProfilePageState extends State<EditProfilePage>
       final cachedDataJson = prefs.getString('user_profile_cache');
 
       if (cachedDataJson != null) {
-        return json.decode(cachedDataJson);
+        Map<String, dynamic> cachedData = json.decode(cachedDataJson);
+
+        // Convert milliseconds back to Timestamp if necessary
+        cachedData.forEach((key, value) {
+          if (value is int) {
+            cachedData[key] = Timestamp.fromMillisecondsSinceEpoch(value);
+          }
+        });
+
+        return cachedData;
       }
       return null;
     } catch (e) {
       print('Error loading cached data: $e');
       return null;
     }
-  } // บันทึกข้อมูลลง Cache
+  }
 
   Future<void> _cacheUserData(Map<String, dynamic> userData) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_profile_cache', json.encode(userData));
+
+      // Create a new map to hold the serializable data
+      Map<String, dynamic> serializableData = {};
+
+      userData.forEach((key, value) {
+        if (value is Timestamp) {
+          // Convert Timestamp to milliseconds since epoch
+          serializableData[key] = value.millisecondsSinceEpoch;
+        } else {
+          serializableData[key] = value; // Keep other types as they are
+        }
+      });
+
+      await prefs.setString(
+          'user_profile_cache', json.encode(serializableData));
       await prefs.setString(
           'last_cache_time', DateTime.now().toIso8601String());
     } catch (e) {
       print('Error caching user data: $e');
     }
-  } // ดึงข้อมูลล่าสุดจาก Firestore
+  }
 
   Future<Map<String, dynamic>> _fetchLatestUserData() async {
     try {
@@ -459,9 +565,13 @@ class _EditProfilePageState extends State<EditProfilePage>
       _emailController.text = userData['email'] ?? '';
       _phoneController.text = userData['phone'] ?? '';
       _addressController.text = userData['address'] ?? '';
-      _profileImageUrl = userData['profileImageUrl'];
+
+      // ตรวจสอบว่า URL รูปภาพโปรไฟล์มีค่าอยู่หรือไม่
+      _profileImageUrl =
+          userData['profileImageUrl'] ?? null; // ตั้งค่า URL รูปภาพโปรไฟล์
+      _profileImagePath = null; // รีเซ็ต path ของรูปภาพโปรไฟล์
     });
-  } // จัดการข้อผิดพลาดในการโหลดข้อมูล
+  }
 
   void _handleDataLoadError(dynamic error) {
     if (_isDisposed) return;
@@ -498,7 +608,7 @@ class _EditProfilePageState extends State<EditProfilePage>
   Future<void> _initializePage() async {
     try {
       // โหลดข้อมูลผู้ใช้
-      await _fetchInitialUserData();
+      await _fetchInitialUserData(); // เรียกใช้เพื่อโหลดข้อมูลล่าสุด
 
       // อัปเดต State ด้วยข้อมูลที่โหลด
       setState(() {
@@ -518,6 +628,7 @@ class _EditProfilePageState extends State<EditProfilePage>
     void checkChanges() {
       if (!mounted) return;
 
+      // เปรียบเทียบค่าปัจจุบันกับค่าเดิมอย่างระมัดระวัง
       bool usernameChanged = _usernameController.text.trim() !=
           (widget.userData['username'] ?? '').trim();
       bool emailChanged = _emailController.text.trim() !=
@@ -526,14 +637,33 @@ class _EditProfilePageState extends State<EditProfilePage>
           (widget.userData['phone'] ?? '').trim();
       bool addressChanged = _addressController.text.trim() !=
           (widget.userData['address'] ?? '').trim();
+      bool profileImageChanged = (_profileImageUrl ?? '') !=
+          (widget.userData['profileImageUrl'] ?? '');
+
+      // Debug print เพื่อตรวจสอบการเปลี่ยนแปลง
+      print('Username changed: $usernameChanged');
+      print('Email changed: $emailChanged');
+      print('Phone changed: $phoneChanged');
+      print('Address changed: $addressChanged');
+      print('Profile image changed: $profileImageChanged');
 
       // Update hasChanges state
       safeSetState(() {
-        _hasChanges =
-            usernameChanged || emailChanged || phoneChanged || addressChanged;
+        _hasChanges = usernameChanged ||
+            emailChanged ||
+            phoneChanged ||
+            addressChanged ||
+            profileImageChanged;
       });
     }
 
+    // Remove previous listeners first to prevent multiple listeners
+    _usernameController.removeListener(checkChanges);
+    _emailController.removeListener(checkChanges);
+    _phoneController.removeListener(checkChanges);
+    _addressController.removeListener(checkChanges);
+
+    // Add listeners
     _usernameController.addListener(checkChanges);
     _emailController.addListener(checkChanges);
     _phoneController.addListener(checkChanges);
@@ -563,7 +693,15 @@ class _EditProfilePageState extends State<EditProfilePage>
     bool phoneChanged = _phoneController.text.trim() != originalPhone.trim();
     bool addressChanged =
         _addressController.text.trim() != originalAddress.trim();
-    bool profileImageChanged = (_profileImageUrl ?? '') != originalProfileImage;
+    bool profileImageChanged = (_profileImagePath != null &&
+        _profileImagePath != originalProfileImage);
+
+    // Debug print เพื่อตรวจสอบการเปลี่ยนแปลง
+    print('Username changed: $usernameChanged');
+    print('Email changed: $emailChanged');
+    print('Phone changed: $phoneChanged');
+    print('Address changed: $addressChanged');
+    print('Profile image changed: $profileImageChanged');
 
     // คืนค่าว่ามีการเปลี่ยนแปลงหรือไม่
     return usernameChanged ||
@@ -593,12 +731,11 @@ class _EditProfilePageState extends State<EditProfilePage>
     super.dispose();
   }
 
-  // ติดตามสถานะแอป
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       // รีโหลดข้อมูลเมื่อกลับมาที่แอป
-      _initializePage();
+      _initializePage(); // เรียกใช้งานฟังก์ชันนี้เพื่อดึงข้อมูลล่าสุด
     }
   }
 
@@ -669,18 +806,16 @@ class _EditProfilePageState extends State<EditProfilePage>
 
   Future<void> _fetchInitialUserData() async {
     try {
-      final userData = await _fetchUserData(); // ใช้เมธอดดึงข้อมูลที่มีอยู่
+      final userData =
+          await FirebaseService.fetchUserData(); // ใช้เมธอดดึงข้อมูลที่มีอยู่
       setState(() {
         _userData = userData;
-        // โตเตอะ controllers ด้วยข้อมูลล่าสุด
-        _usernameController =
-            TextEditingController(text: _userData['username'] ?? '');
-        _emailController =
-            TextEditingController(text: _userData['email'] ?? '');
-        _phoneController =
-            TextEditingController(text: _userData['phone'] ?? '');
-        _addressController =
-            TextEditingController(text: _userData['address'] ?? '');
+        _usernameController.text = _userData['username'] ?? '';
+        _emailController.text = _userData['email'] ?? '';
+        _phoneController.text = _userData['phone'] ?? '';
+        _addressController.text = _userData['address'] ?? '';
+        _profileImageUrl =
+            _userData['profileImageUrl']; // ดึง URL รูปภาพจาก Firestore
       });
     } catch (e) {
       print('เกิดข้อผิดพลาดในการดึงข้อมูล: $e');
@@ -792,61 +927,57 @@ class _EditProfilePageState extends State<EditProfilePage>
   }
 
   Future<void> _selectProfileImage() async {
-    bool? confirm = await showDialog<bool>(
+    // เปิดเมนูให้เลือกแหล่งที่มาของรูปภาพทันที
+    await showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('เปลี่ยนรูปโปรไฟล์'),
-        content: const Text('คุณต้องการเปลี่ยนรูปโปรไฟล์ใช่หรือไม่?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('ยกเลิก'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('ใช่'),
-          ),
-        ],
+        title: const Text('Select Profile Picture'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Take a Photo'),
+              onTap: () {
+                Navigator.of(context).pop(); // ปิด Dialog
+                _pickImage(ImageSource.camera); // เรียกฟังก์ชันเลือกภาพจากกล้อง
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Gallery'),
+              onTap: () {
+                Navigator.of(context).pop(); // ปิด Dialog
+                _pickImage(ImageSource.gallery); // เรียกฟังก์ชันเลือกภาพจากคลัง
+              },
+            ),
+          ],
+        ),
       ),
     );
-
-    if (confirm == true) {
-      await showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('เลือกรูปโปรไฟล์'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.camera_alt),
-                title: const Text('ถ่ายรูป'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _pickImage(ImageSource.camera);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library),
-                title: const Text('เลือกจากคลังภาพ'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _pickImage(ImageSource.gallery);
-                },
-              ),
-            ],
-          ),
-        ),
-      );
-    }
   }
 
+  final ImagePicker _picker = ImagePicker();
   Future<void> _pickImage(ImageSource source) async {
     try {
-      final pickedFile = await ImagePicker().pickImage(source: source);
+      final pickedFile = await _picker.pickImage(
+        source: source,
+        imageQuality: 100,
+      );
 
       if (pickedFile != null) {
-        await _uploadProfileImage(File(pickedFile.path));
+        // บันทึกรูปภาพลงในเครื่อง
+        final directory = await getApplicationDocumentsDirectory();
+        final fileName =
+            'profile_image_${DateTime.now().millisecondsSinceEpoch}.png';
+        final savedImage =
+            await File(pickedFile.path).copy('${directory.path}/$fileName');
+
+        setState(() {
+          _profileImagePath = savedImage.path;
+          _profileImageUrl = null; // ตั้งค่า URL เป็น null
+          _hasChanges = true;
+        });
       }
     } catch (e) {
       print('เกิดข้อผิดพลาดในการเลือกรูปภาพ: $e');
@@ -856,7 +987,7 @@ class _EditProfilePageState extends State<EditProfilePage>
     }
   }
 
-  Future<void> _uploadProfileImage(File imageFile) async {
+  /*Future<void> _uploadProfileImage(File imageFile) async {
     try {
       User? currentUser = FirebaseAuth.instance.currentUser;
 
@@ -899,7 +1030,7 @@ class _EditProfilePageState extends State<EditProfilePage>
         ),
       );
     }
-  }
+  }*/
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
@@ -907,12 +1038,10 @@ class _EditProfilePageState extends State<EditProfilePage>
       backgroundColor: Colors.transparent,
       leading: IconButton(
         icon: Icon(Icons.arrow_back_ios, color: Colors.black87),
-        onPressed: () => _onWillPop().then((canPop) {
-          if (canPop) Navigator.pop(context);
-        }),
+        onPressed: () => Navigator.pop(context),
       ),
       title: Text(
-        'แก้ไขโปรไฟล์',
+        'Edit Profile',
         style: TextStyle(
           color: Colors.black87,
           fontWeight: FontWeight.bold,
@@ -963,22 +1092,94 @@ class _EditProfilePageState extends State<EditProfilePage>
 
   Widget _buildProfileImageSection() {
     return GestureDetector(
-      onTap: _selectProfileImage,
+      onTap: () => _selectProfileImage(),
       child: Hero(
         tag: 'profile_image',
         child: CircleAvatar(
           radius: 80,
           backgroundColor: Colors.green.shade100,
-          backgroundImage: _profileImageUrl != null
-              ? NetworkImage(_profileImageUrl!)
-              : AssetImage('assets/default_profile.png') as ImageProvider,
-          child: Align(
-            alignment: Alignment.bottomRight,
-            child:
-                _buildCameraButton(), // ตรวจสอบให้แน่ใจว่า _buildCameraButton() คืนค่า Widget ที่ถูกต้อง
-          ),
+          child: _buildProfileImageContent(),
         ),
       ),
+    );
+  }
+
+  Widget _buildProfileImageContent() {
+    print('Profile Image Path: $_profileImagePath');
+    print('Profile Image URL: $_profileImageUrl');
+
+    // กรณีที่ไม่มีรูปภาพ
+    if (_profileImagePath == null && _profileImageUrl == null) {
+      return CircleAvatar(
+        radius: 75,
+        backgroundColor: Colors.green.shade100,
+        child: Icon(Icons.person, size: 80, color: Colors.green.shade800),
+      );
+    }
+
+    // กรณีมี path ของไฟล์ (local file)
+    if (_profileImagePath != null) {
+      final File imageFile = File(_profileImagePath!);
+      if (imageFile.existsSync()) {
+        return CircleAvatar(
+          radius: 75,
+          backgroundImage: FileImage(imageFile),
+          child: _buildCameraButton(),
+        );
+      }
+    }
+
+    // กรณีมี URL จาก Firebase หรือ Network
+    if (_profileImageUrl != null) {
+      // ตรวจสอบว่าเป็น local path หรือ network URL
+      if (_profileImageUrl!.startsWith('/') ||
+          _profileImageUrl!.startsWith('file://')) {
+        final File imageFile = File(_profileImageUrl!);
+        if (imageFile.existsSync()) {
+          return CircleAvatar(
+            radius: 75,
+            backgroundImage: FileImage(imageFile),
+            child: _buildCameraButton(),
+          );
+        }
+      } else {
+        // กรณีเป็น Network URL
+        return CachedNetworkImage(
+          imageUrl: _profileImageUrl!,
+          imageBuilder: (context, imageProvider) => CircleAvatar(
+            radius: 75,
+            backgroundImage: imageProvider,
+            child: _buildCameraButton(),
+          ),
+          placeholder: (context, url) => CircleAvatar(
+            radius: 75,
+            backgroundColor: Colors.green.shade100,
+            child: CircularProgressIndicator(
+              color: Colors.green.shade800,
+            ),
+          ),
+          errorWidget: (context, url, error) => CircleAvatar(
+            radius: 75,
+            backgroundColor: Colors.green.shade100,
+            child: Icon(Icons.person, size: 80, color: Colors.green.shade800),
+          ),
+        );
+      }
+    }
+
+    // Fallback to default avatar
+    return CircleAvatar(
+      radius: 75,
+      backgroundColor: Colors.green.shade100,
+      child: Icon(Icons.person, size: 80, color: Colors.green.shade800),
+    );
+  }
+
+  Widget _buildDefaultProfileAvatar() {
+    return CircleAvatar(
+      radius: 75,
+      backgroundColor: Colors.green.shade100,
+      child: Icon(Icons.person, size: 80, color: Colors.green.shade800),
     );
   }
 
@@ -1068,24 +1269,24 @@ class _EditProfilePageState extends State<EditProfilePage>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSectionTitle('ข้อมูลส่วนตัว'),
+              _buildSectionTitle('Personal Information'),
               SizedBox(height: 20),
               _buildTextField(
                 controller: _usernameController,
-                label: 'ชื่อผู้ใช้',
+                label: 'Username',
                 icon: Icons.person_outline,
                 validator: _validateUsername,
               ),
               SizedBox(height: 15),
               _buildTextField(
                 controller: _addressController,
-                label: 'ที่อยู่',
+                label: 'Address',
                 icon: Icons.location_on_outlined,
                 maxLines: 3,
                 validator: _validateAddress,
               ),
               SizedBox(height: 25),
-              _buildSectionTitle('ข้อมูลการติดต่อ'),
+              _buildSectionTitle('Contact Information'),
               SizedBox(height: 20),
               _buildContactInfo(),
             ],
@@ -1135,7 +1336,7 @@ class _EditProfilePageState extends State<EditProfilePage>
       children: [
         _buildContactTile(
           icon: Icons.email_outlined,
-          title: 'อีเมล',
+          title: 'Mail',
           value: FirebaseAuth.instance.currentUser?.email ?? 'ไม่มีอีเมล',
           verificationStatus: _emailVerificationStatus,
           isVerified: _isEmailVerified,
@@ -1144,9 +1345,9 @@ class _EditProfilePageState extends State<EditProfilePage>
         SizedBox(height: 15),
         _buildContactTile(
           icon: Icons.phone_outlined,
-          title: 'เบอร์โทรศัพท์',
+          title: 'Phone Nuber',
           value: _phoneController.text,
-          verificationStatus: 'ไม่ต้องยืนยัน',
+          verificationStatus: 'No Confirmation Needed',
           isVerified: true, // แสดงว่ามีเบอร์โทรศัพท์
           onTap: () => _showPhoneUpdateDialog(),
         ),
@@ -1214,10 +1415,10 @@ class _EditProfilePageState extends State<EditProfilePage>
   // Validation methods
   String? _validateUsername(String? value) {
     if (value == null || value.isEmpty) {
-      return 'กรุณากรอกชื่อผู้ใช้';
+      return 'Please enter a username';
     }
     if (value.length < 3) {
-      return 'ชื่อผู้ใช้ต้องมีความยาวอย่างน้อย 3 ตัว อักษร';
+      return 'The username must be at least 3 characters long';
     }
     return null;
   }
@@ -1234,7 +1435,7 @@ class _EditProfilePageState extends State<EditProfilePage>
 
   Future<bool> _onWillPop() async {
     // ตรวจสอบว่ามีการเปลี่ยนแปลงหรือไม่
-    if (_hasChanges) {
+    if (_checkForChanges()) {
       final result = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
@@ -1348,7 +1549,7 @@ class _EditProfilePageState extends State<EditProfilePage>
       onWillPop: _onWillPop, // ใช้เมธอดนี้เพื่อจัดการการออกจากหน้า
       child: Scaffold(
         appBar: AppBar(
-          title: Text('แก้ไขโปรไฟล์'),
+          title: Text('Edit Profile'),
           leading: IconButton(
             icon: Icon(Icons.arrow_back),
             onPressed: () => _handleBackNavigation(), // ใช้เมธอดใหม่นี้
@@ -1431,7 +1632,7 @@ class _EditProfilePageState extends State<EditProfilePage>
         ),
         icon: Icon(Icons.save, color: Colors.white),
         label: Text(
-          'บันทึกการเปลี่ยนแปลง',
+          'Save changes',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -1534,12 +1735,12 @@ class _EditProfilePageState extends State<EditProfilePage>
             TextFormField(
               controller: _usernameController,
               decoration: InputDecoration(
-                labelText: 'ชื่อผู้ใช้',
+                labelText: 'Username',
                 border: OutlineInputBorder(),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'กรุณากรอกชื่อผู้ใช้';
+                  return 'Please enter a username';
                 }
                 return null;
               },
@@ -1550,12 +1751,12 @@ class _EditProfilePageState extends State<EditProfilePage>
             TextFormField(
               controller: _emailController,
               decoration: InputDecoration(
-                labelText: 'อีเมล',
+                labelText: 'Mail',
                 border: OutlineInputBorder(),
               ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
-                  return 'กรุณากรอกอีเมล';
+                  return 'Please enter your email';
                 }
                 if (!EmailValidator.validate(value)) {
                   return 'รูปแบบอีเมลไม่ถูกต้อง';
@@ -1828,66 +2029,231 @@ class _EditProfilePageState extends State<EditProfilePage>
   }
 
   Future<void> _saveProfile() async {
-    // ตรวจสอบ Widget state
     if (!mounted || !_isInitialized) return;
 
+    // ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต
+    bool hasInternet = await _checkInternetConnectivity();
+    if (!hasInternet) {
+      _showQuickFeedback(
+        message: 'กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต',
+        isError: true,
+      );
+      return;
+    }
+
+    // ตรวจสอบว่ามีการเปลี่ยนแปลงจริงๆ
+    if (!_checkForChanges()) {
+      _showQuickFeedback(
+        message: 'ไม่มีข้อมูลที่เปลี่ยนแปลง',
+        isError: false,
+      );
+      return;
+    }
+
+    _showProgressIndicator();
+
     try {
-      // ตรวจสอบว่ามีการเปลี่ยนแปลง
-      if (!_hasChanges) {
-        print('ไม่มีการเปลี่ยนแปลง');
-        return;
-      }
-
       // ตรวจสอบความถูกต้องของข้อมูล
-      if (!_validateInputs()) {
+      if (!_validateProfileData()) {
+        _hideProgressIndicator();
         return;
       }
 
-      User? currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) {
-        _showErrorSnackBar('ไม่พบผู้ใช้');
-        return;
-      }
+      // เตรียมข้อมูลที่จะอัปเดต
+      Map<String, dynamic> updateData = _prepareUpdateData();
 
-      // เตรียม Map สำหรับอัปเดต
-      Map<String, dynamic> updateData = {};
+      // เพิ่ม lastUpdated เข้าไปใน updateData
+      updateData['lastUpdated'] = FieldValue.serverTimestamp();
 
-      // เพิ่มการตรวจสอบและเพิ่มข้อมูลที่ต้องการอัปเดต
-      _checkAndAddUpdates(updateData);
-
-      // ถ้าไม่มีการเปลี่ยนแปลง
+      // ตรวจสอบว่ามีข้อมูลที่ต้องอัปเดต
       if (updateData.isEmpty) {
-        _showErrorSnackBar('ไม่มีข้อมูลที่ต้องอัปเดต');
+        _hideProgressIndicator();
+        _showQuickFeedback(
+          message: 'ไม่มีข้อมูลที่ต้องอัปเดต',
+          isError: false,
+        );
         return;
+      }
+
+      // ตรวจสอบว่ามีรูปภาพโปรไฟล์ใหม่หรือไม่
+      if (_profileImagePath != null) {
+        // บันทึกที่อยู่ของรูปภาพในข้อมูลที่จะอัปเดต
+        updateData['profileImageUrl'] = _profileImagePath;
       }
 
       // อัปเดตข้อมูลใน Firestore
       await FirebaseFirestore.instance
           .collection('users')
-          .doc(currentUser.uid)
+          .doc(FirebaseAuth.instance.currentUser?.uid)
           .update(updateData);
 
-      // อัปเดต local state
-      setState(() {
-        // อัปเดตข้อมูลใน widget.userData
-        updateData.forEach((key, value) {
-          widget.userData[key] = value;
-        });
-        _hasChanges = false; // ตั้งค่าเป็น false หลังจากบันทึก
-      });
+      // อัปเดตข้อมูลใน local state
+      _updateLocalState(updateData);
 
-      // แสดง Snackbar แจ้งความสำเร็จ
-      _showSuccessSnackBar('บันทึกข้อมูลสำเร็จ');
-    } catch (e) {
-      print('เกิดข้อผิดพลาดในการบันทึก: $e');
+      _hideProgressIndicator();
+      _showSuccessFeedback();
+    } catch (error) {
+      _hideProgressIndicator();
+      _handleError(error);
+    }
+  }
 
-      // แสดง Snackbar แบบปลอดภัย
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('ข้อผิดพลาด: $e')),
-        );
+  bool _validateProfileData() {
+    // ตรวจสอบความถูกต้องของข้อมูลโปรไฟล์
+    if (_usernameController.text.trim().isEmpty) {
+      _showQuickFeedback(
+        message: 'กรุณากรอกชื่อผู้ใช้',
+        isError: true,
+      );
+      return false;
+    }
+
+    if (_emailController.text.trim().isEmpty) {
+      _showQuickFeedback(
+        message: 'กรุณากรอกอีเมล',
+        isError: true,
+      );
+      return false;
+    }
+
+    // ตรวจสอบรูปแบบอีเมล
+    if (!_isValidEmail(_emailController.text.trim())) {
+      _showQuickFeedback(
+        message: 'รูปแบบอีเมลไม่ถูกต้อง',
+        isError: true,
+      );
+      return false;
+    }
+
+    return true;
+  } // เตรียมข้อมูลที่จะอัปเดต
+
+  Map<String, dynamic> _prepareUpdateData() {
+    Map<String, dynamic> updateData = {};
+
+    // เตรียมข้อมูลที่จะอัปเดต
+    if (_usernameController.text.trim() !=
+        (widget.userData['username'] ?? '').trim()) {
+      updateData['username'] = _usernameController.text.trim();
+    }
+
+    if (_emailController.text.trim() !=
+        (widget.userData['email'] ?? '').trim()) {
+      updateData['email'] = _emailController.text.trim();
+    }
+
+    if (_phoneController.text.trim() !=
+        (widget.userData['phone'] ?? '').trim()) {
+      updateData['phone'] = _phoneController.text.trim();
+    }
+
+    if (_addressController.text.trim() !=
+        (widget.userData['address'] ?? '').trim()) {
+      updateData['address'] = _addressController.text.trim();
+    }
+
+    // เตรียมข้อมูลที่จะอัปเดตสำหรับรูปภาพโปรไฟล์
+    if (_profileImagePath != null &&
+        _profileImagePath != (widget.userData['profileImageUrl'] ?? '')) {
+      updateData['profileImageUrl'] = _profileImagePath;
+    }
+
+    return updateData;
+  }
+
+  void _addIfChanged(
+      Map<String, dynamic> updateData, String key, String value) {
+    // เปรียบเทียบค่าปัจจุบันกับค่าเดิม
+    if (value.trim() != (widget.userData[key] ?? '').trim()) {
+      updateData[key] = value.trim();
+    }
+  } // ดำเนินการอัปเดตข้อมูล
+
+  Future<void> _performProfileUpdate(Map<String, dynamic> updateData) async {
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      throw Exception('ไม่พบผู้ใช้งาน');
+    }
+
+    // เพิ่มเวลาอัปเดตล่าสุด
+    updateData['lastUpdated'] = FieldValue.serverTimestamp();
+
+    // อัปเดตข้อมูลใน Firestore
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(currentUser.uid)
+        .update(updateData);
+
+    // บันทึกประวัติการอัปเดต
+    await _saveUpdateHistory(updateData);
+
+    // อัปเดต local state
+    _updateLocalState(updateData);
+  }
+
+  Future<void> _updateUserProfileWithRetry(
+      User currentUser, Map<String, dynamic> updateData) async {
+    const maxRetries = 3;
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        updateData['lastUpdated'] = FieldValue.serverTimestamp();
+
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .update(updateData);
+
+        return; // สำเร็จ ออกจากฟังก์ชัน
+      } catch (e) {
+        if (attempt == maxRetries) rethrow; // ลองครบจำนวนแล้ว โยนข้อผิดพลาด
+
+        // รอก่อนลองใหม่
+        await Future.delayed(Duration(seconds: 2 * attempt));
       }
     }
+  } // อัปเดตข้อมูลในสถานะภายในแอป
+
+  void _updateLocalUserData(Map<String, dynamic> updateData) {
+    setState(() {
+      updateData.forEach((key, value) {
+        widget.userData[key] = value;
+      });
+      _hasChanges = false;
+    });
+  } // แสดง Dialog โหลด
+
+  void _showLoadingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+        ),
+      ),
+    );
+  } // จัดการข้อผิดพลาดเฉพาะของ Firebase
+
+  void _handleFirebaseCustomError(FirebaseCustomException e) {
+    String errorMessage;
+    switch (e.code) {
+      case 'user_not_found':
+        errorMessage = 'ไม่พบบัญชีผู้ใช้';
+        break;
+      case 'permission_denied':
+        errorMessage = 'ไม่มีสิทธิ์ในการอัปเดตข้อมูล';
+        break;
+      default:
+        errorMessage = e.message;
+    }
+    _showErrorSnackBar(errorMessage);
+  } // จัดการข้อผิดพลาดที่ไม่คาดคิด
+
+  void _handleUnexpectedError(dynamic error) {
+    String errorMessage = 'เกิดข้อผิดพลาดที่ไม่คาดคิด: ${error.toString()}';
+    _showErrorSnackBar(errorMessage);
+    // บันทึก log error หากต้องการ
+    print(errorMessage);
   }
 
   Future<void> _navigateToEditProfile() async {
@@ -1919,34 +2285,98 @@ class _EditProfilePageState extends State<EditProfilePage>
       'updatedBy': currentUser.uid,
       'lastUpdated': FieldValue.serverTimestamp(), // เพิ่มฟิลด์นี้
     });
+  } // อัปเดต local state
+
+  void _updateLocalState(Map<String, dynamic> updateData) {
+    // อัปเดตข้อมูลใน widget.userData
+    updateData.forEach((key, value) {
+      widget.userData[key] = value;
+    });
+
+    // ตั้งค่าเป็น false หลังจากบันทึก
+    _hasChanges = false;
+
+    // อัปเดตข้อมูลใน TextEditingController
+    _usernameController.text = widget.userData['username'] ?? '';
+    _emailController.text = widget.userData['email'] ?? '';
+    _phoneController.text = widget.userData['phone'] ?? '';
+    _addressController.text = widget.userData['address'] ?? '';
+
+    // อัปเดตรูปภาพโปรไฟล์
+    if (updateData.containsKey('profileImageUrl')) {
+      _profileImagePath = updateData['profileImageUrl'];
+    }
   }
 
-  void _checkAndAddUpdates(Map<String, dynamic> updateData) {
-    // เพิ่มเงื่อนไขสำหรับอีเมล
-    if (_emailController.text.trim() != widget.userData['email']) {
-      updateData['email'] = _emailController.text.trim();
-    }
+  void _handleUpdateError(dynamic error) {
+    // ซ่อน Loading
+    _hideProgressIndicator();
 
-    if (_usernameController.text.trim() != widget.userData['username']) {
+    // แสดงข้อความแจ้งเตือนข้อผิดพลาด
+    _showQuickFeedback(
+      message: _getErrorMessage(error),
+      isError: true,
+    );
+    print('Error updating profile: $error');
+  } // แสดงข้อความแจ้งเตือนแบบรวดเร็ว
+
+  void _showQuickFeedback({required String message, required bool isError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+      ),
+    );
+  } // แสดง Loading Indicator
+
+  void _showProgressIndicator() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(child: CircularProgressIndicator()),
+    );
+  } // ซ่อน Loading Indicator
+
+  void _hideProgressIndicator() {
+    Navigator.of(context).pop(); // ปิด Loading Dialog
+  } // แสดงข้อความแจ้งเตือนความสำเร็จ
+
+  void _showSuccessFeedback() {
+    _showQuickFeedback(
+      message: 'บันทึกข้อมูลสำเร็จ',
+      isError: false,
+    );
+  }
+
+  // บันทึก log error (ถ้า ต้องการ)
+
+  void _checkAndAddUpdates(Map<String, dynamic> updateData) {
+    // เปรียบเทียบค่าปัจจุบันกับค่าเดิม
+    if (_usernameController.text.trim() !=
+        (widget.userData['username'] ?? '').trim()) {
       updateData['username'] = _usernameController.text.trim();
     }
 
-    if (_phoneController.text.trim() != widget.userData['phone']) {
+    if (_emailController.text.trim() !=
+        (widget.userData['email'] ?? '').trim()) {
+      updateData['email'] = _emailController.text.trim();
+    }
+
+    if (_phoneController.text.trim() !=
+        (widget.userData['phone'] ?? '').trim()) {
       updateData['phone'] = _phoneController.text.trim();
     }
 
-    if (_addressController.text.trim() != widget.userData['address']) {
+    if (_addressController.text.trim() !=
+        (widget.userData['address'] ?? '').trim()) {
       updateData['address'] = _addressController.text.trim();
     }
 
-    // เพิ่มการอัปเดตรูปโปรไฟล์หากมีการเปลี่ยนแปลง
-    if (_profileImageUrl != null &&
-        _profileImageUrl != widget.userData['profileImageUrl']) {
-      updateData['profileImageUrl'] = _profileImageUrl;
+    // เปรียบเทียบรูปภาพโปรไฟล์
+    if ((_profileImagePath ?? '') !=
+        (widget.userData['profileImageUrl'] ?? '')) {
+      updateData['profileImageUrl'] = _profileImagePath;
     }
-
-    // ตรวจสอบว่ามีการเปลี่ยนแปลงหรือไม่
-    _hasChanges = updateData.isNotEmpty;
   }
 
   Future<void> _updateUserProfile(
@@ -2297,7 +2727,7 @@ class _EditProfilePageState extends State<EditProfilePage>
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'อัปเดตอีเมล',
+                'Change Email',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -2308,7 +2738,7 @@ class _EditProfilePageState extends State<EditProfilePage>
               TextField(
                 controller: emailController,
                 decoration: InputDecoration(
-                  labelText: 'อีเมลใหม่',
+                  labelText: 'New Email',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -2318,7 +2748,7 @@ class _EditProfilePageState extends State<EditProfilePage>
               ),
               SizedBox(height: 16),
               Text(
-                'กรุณากรอกอีเมลใหม่\nระบบจะส่งลิงก์ยืนยันไปยังอีเมลนี้',
+                'Enter your new email address to receive a verification link',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey),
               ),
@@ -2329,7 +2759,7 @@ class _EditProfilePageState extends State<EditProfilePage>
                   TextButton(
                     onPressed: () => Navigator.pop(context),
                     child: Text(
-                      'ยกเลิก',
+                      'Cancel',
                       style: TextStyle(color: Colors.grey),
                     ),
                   ),
@@ -2347,14 +2777,14 @@ class _EditProfilePageState extends State<EditProfilePage>
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('รูปแบบอีเมลไม่ถูกต้อง'),
+                            content: Text('Invalid email format'),
                             backgroundColor: Colors.red,
                           ),
                         );
                       }
                     },
                     child: Text(
-                      'ส่งการยืนยัน',
+                      'Send Verification',
                       style: TextStyle(color: Colors.white),
                     ),
                   )
@@ -2376,14 +2806,14 @@ class _EditProfilePageState extends State<EditProfilePage>
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: Text('อัปเดตเบอร์โทรศัพท์'),
+          title: Text('Update Phone Number'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: phoneController,
                 decoration: InputDecoration(
-                  labelText: 'เบอร์โทรศัพท์ใหม่',
+                  labelText: 'New Phone Number',
                   prefixText: '+66 ',
                   border: OutlineInputBorder(),
                   errorText: errorText,
@@ -2404,7 +2834,7 @@ class _EditProfilePageState extends State<EditProfilePage>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('ยกเลิก'),
+              child: Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: _isValidPhoneNumber(phoneController.text)
@@ -2413,7 +2843,7 @@ class _EditProfilePageState extends State<EditProfilePage>
                       _handlePhoneUpdate(context, phoneController.text);
                     }
                   : null,
-              child: Text('บันทึก'),
+              child: Text('Confirm'),
             ),
           ],
         ),
@@ -2483,9 +2913,19 @@ class _EditProfilePageState extends State<EditProfilePage>
     );
   }
 
-// Helper Methods
+  // ฟังก์ชันตรวจสอบรูปแบบอีเมล
   bool _isValidEmail(String email) {
-    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
+    final RegExp emailRegex = RegExp(
+      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+    );
+    return emailRegex.hasMatch(email);
+  } // ฟังก์ชันเพื่อดึงข้อความข้อผิดพลาด
+
+  String _getErrorMessage(dynamic error) {
+    if (error is FirebaseException) {
+      return error.message ?? 'เกิดข้อผิดพลาดที่ไม่คาดคิด';
+    }
+    return 'เกิดข้อผิดพลาด: ${error.toString()}';
   }
 
   Future<void> _sendPhoneOTP(String phoneNumber) async {
