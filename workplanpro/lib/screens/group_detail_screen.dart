@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../widgets/group_member_tab.dart';
+import 'group_settings_screen.dart';
 
 class GroupDetailScreen extends StatefulWidget {
   final String groupId;
@@ -41,7 +42,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           .collection('groups')
           .doc(widget.groupId)
           .get();
-      
+
       if (mounted) {
         setState(() {
           groupData = doc.data() as Map<String, dynamic>;
@@ -137,10 +138,12 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
             itemBuilder: (context, index) {
               final message = messages[index];
               final isMyMessage = message['senderEmail'] == widget.userEmail;
-              final date = (message['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now();
-              
+              final date = (message['createdAt'] as Timestamp?)?.toDate() ??
+                  DateTime.now();
+
               return Align(
-                alignment: isMyMessage ? Alignment.centerRight : Alignment.centerLeft,
+                alignment:
+                    isMyMessage ? Alignment.centerRight : Alignment.centerLeft,
                 child: Container(
                   margin: EdgeInsets.only(
                     bottom: 8,
@@ -179,7 +182,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                           DateFormat('HH:mm').format(date),
                           style: TextStyle(
                             fontSize: 10,
-                            color: isMyMessage ? Colors.white70 : Colors.grey[600],
+                            color:
+                                isMyMessage ? Colors.white70 : Colors.grey[600],
                           ),
                         ),
                       ),
@@ -202,7 +206,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(25),
                     ),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   ),
                 ),
               ),
@@ -267,9 +272,27 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.more_vert, color: Colors.white),
-            onPressed: () {
-              // Show group settings menu
+            icon: Icon(Icons.settings, color: Colors.white),
+            onPressed: () async {
+              // ดึงข้อมูลกลุ่มก่อน
+              final groupDoc = await FirebaseFirestore.instance
+                  .collection('groups')
+                  .doc(widget.groupId)
+                  .get();
+
+              if (!mounted) return;
+
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => GroupSettingsScreen(
+                    groupId: widget.groupId,
+                    currentUserEmail: widget.userEmail,
+                    isOwner:
+                        groupDoc.data()?['creatorEmail'] == widget.userEmail,
+                  ),
+                ),
+              );
             },
           ),
         ],
@@ -289,7 +312,8 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                 TextButton.icon(
                   onPressed: () => setState(() => _selectedTabIndex = 1),
                   icon: Icon(Icons.calendar_today, color: Colors.white),
-                  label: Text('Calendar', style: TextStyle(color: Colors.white)),
+                  label:
+                      Text('Calendar', style: TextStyle(color: Colors.white)),
                 ),
                 TextButton.icon(
                   onPressed: () => setState(() => _selectedTabIndex = 2),

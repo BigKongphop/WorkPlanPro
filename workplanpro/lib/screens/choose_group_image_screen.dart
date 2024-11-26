@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 class ChooseGroupImageScreen extends StatefulWidget {
-  final Function(dynamic) onImageSelected;
   final String? currentImage;
+  final Function(dynamic) onImageSelected;
 
   const ChooseGroupImageScreen({
     Key? key,
@@ -47,27 +47,9 @@ class _ChooseGroupImageScreenState extends State<ChooseGroupImageScreen> {
       print('Error picking image: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to pick image: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Failed to pick image: $e')),
         );
       }
-    }
-  }
-
-  void _selectDefaultImage(String imagePath) {
-    try {
-      widget.onImageSelected(imagePath);
-      Navigator.pop(context, imagePath);
-    } catch (e) {
-      print('Error selecting default image: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to select image: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
   }
 
@@ -75,53 +57,56 @@ class _ChooseGroupImageScreenState extends State<ChooseGroupImageScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Choose Group Image', style: TextStyle(color: Colors.white)),
         backgroundColor: const Color(0xFF0C5217),
+        title: const Text(
+          'Choose Group Image',
+          style: TextStyle(color: Colors.white),
+        ),
       ),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
-              padding: EdgeInsets.all(16.0),
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Text(
                 'Choose from gallery or camera',
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
             ListTile(
-              leading: const CircleAvatar(
+              leading: CircleAvatar(
                 backgroundColor: Color(0xFF0C5217),
                 child: Icon(Icons.photo_library, color: Colors.white),
               ),
-              title: const Text('Choose from Gallery'),
+              title: Text('Choose from Gallery'),
               onTap: () => _pickImage(ImageSource.gallery),
             ),
             ListTile(
-              leading: const CircleAvatar(
+              leading: CircleAvatar(
                 backgroundColor: Color(0xFF0C5217),
                 child: Icon(Icons.camera_alt, color: Colors.white),
               ),
-              title: const Text('Take a Photo'),
+              title: Text('Take a Photo'),
               onTap: () => _pickImage(ImageSource.camera),
             ),
-            const Divider(),
-            const Padding(
-              padding: EdgeInsets.all(16.0),
+            Divider(),
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Text(
                 'Default Images',
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
             GridView.builder(
               shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
+              physics: NeverScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
@@ -131,7 +116,10 @@ class _ChooseGroupImageScreenState extends State<ChooseGroupImageScreen> {
               itemCount: defaultImages.length,
               itemBuilder: (context, index) {
                 return InkWell(
-                  onTap: () => _selectDefaultImage(defaultImages[index]),
+                  onTap: () {
+                    widget.onImageSelected(defaultImages[index]);
+                    Navigator.pop(context, defaultImages[index]);
+                  },
                   child: Container(
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
@@ -149,7 +137,7 @@ class _ChooseGroupImageScreenState extends State<ChooseGroupImageScreen> {
                           print('Error loading image: $error');
                           return Container(
                             color: Colors.grey[200],
-                            child: const Icon(Icons.error, color: Colors.red),
+                            child: Icon(Icons.error, color: Colors.red),
                           );
                         },
                       ),

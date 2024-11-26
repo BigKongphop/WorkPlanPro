@@ -63,51 +63,49 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
     setState(() {
       _isLoading = true;
-      _nameError = null;
     });
 
     try {
-      final existingGroups = await FirebaseFirestore.instance
+      // ตรวจสอบชื่อกลุ่มซ้ำ
+      final groupSnapshot = await FirebaseFirestore.instance
           .collection('groups')
           .where('name', isEqualTo: _nameController.text.trim())
           .get();
 
-      if (existingGroups.docs.isNotEmpty) {
-        setState(() {
-          _isLoading = false;
-          _nameError = 'Group name already exists';
-        });
+      if (groupSnapshot.docs.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Group name already exists')),
+        );
         return;
       }
 
+      // อัพโหลดรูปภาพ (ถ้ามี)
       final String? imageUrl = await _uploadImage();
 
-      final batch = FirebaseFirestore.instance.batch();
-      final groupRef = FirebaseFirestore.instance.collection('groups').doc();
-
-      // Add group document with memberEmails array
-      batch.set(groupRef, {
+      // สร้างกลุ่มใหม่
+      final docRef = await FirebaseFirestore.instance.collection('groups').add({
         'name': _nameController.text.trim(),
         'description': _descriptionController.text.trim(),
         'creatorEmail': widget.currentEmail,
         'creatorName': widget.currentUsername,
-        'createdAt': FieldValue.serverTimestamp(),
+        'memberEmails': [widget.currentEmail], // เพิ่ม email ผู้สร้างเป็นสมาชิก
         'memberCount': 1,
         'imageUrl': imageUrl ?? '',
-        'memberEmails': [widget.currentEmail], // Add memberEmails array
+        'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Add creator as admin member
-      final memberRef = groupRef.collection('members').doc();
-      batch.set(memberRef, {
+      // เพิ่มผู้สร้างเป็นสมาชิกแบบ admin
+      await docRef.collection('members').add({
         'email': widget.currentEmail,
         'role': 'admin',
+        'status': 'accepted',
         'joinedAt': FieldValue.serverTimestamp(),
-        'status': 'accepted'
       });
 
-      await batch.commit();
+      // อัพเดท id ของกลุ่ม
+      await docRef.update({'id': docRef.id});
 
+      // ปิดหน้าสร้างกลุ่มและกลับไปหน้า list
       if (mounted) {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -115,11 +113,15 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         );
       }
     } catch (e) {
-      setState(() => _isLoading = false);
+      print('Error creating group: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error creating group: $e')),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }

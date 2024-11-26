@@ -11,14 +11,13 @@ import '../widgets/group_invite_notifications.dart';
 
 class GroupPage extends StatefulWidget {
   final String username;
-  final String userEmail; // Add this line
+  final String userEmail;
 
-  const GroupPage(
-      {Key? key,
-      required this.username,
-      required this.userEmail // Add this parameter
-      })
-      : super(key: key);
+  const GroupPage({
+    Key? key,
+    required this.username,
+    required this.userEmail,
+  }) : super(key: key);
 
   @override
   _GroupPageState createState() => _GroupPageState();
@@ -45,8 +44,7 @@ class _GroupPageState extends State<GroupPage> {
         .snapshots();
   }
 
-  List<QueryDocumentSnapshot> _filterGroups(
-      List<QueryDocumentSnapshot> groups) {
+  List<QueryDocumentSnapshot> _filterGroups(List<QueryDocumentSnapshot> groups) {
     if (_searchQuery.isEmpty) return groups;
     return groups.where((group) {
       final data = group.data() as Map<String, dynamic>;
@@ -67,84 +65,60 @@ class _GroupPageState extends State<GroupPage> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      child: ListTile(
-        contentPadding: EdgeInsets.all(16),
-        leading: Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            color: Colors.grey[200],
+      child: SizedBox(
+        height: 85,
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          leading: ClipRRect(
             borderRadius: BorderRadius.circular(25),
-          ),
-          child:
-              data['imageUrl'] != null && data['imageUrl'].toString().isNotEmpty
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(25),
-                      child: Image.network(
-                        data['imageUrl'].toString(),
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            Icon(Icons.group, color: Colors.grey[400]),
-                      ),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: data['imageUrl'] != null && data['imageUrl'].toString().isNotEmpty
+                  ? Image.network(
+                      data['imageUrl'].toString(),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          Icon(Icons.group, color: Colors.grey[400], size: 24),
                     )
-                  : Icon(Icons.group, color: Colors.grey[400], size: 30),
-        ),
-        title: Text(
-          data['name']?.toString() ?? 'Unnamed Group',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
+                  : Icon(Icons.group, color: Colors.grey[400], size: 24),
+            ),
+          ),
+          title: Text(
+            data['name']?.toString() ?? 'Unnamed Group',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16, // ลดขนาดตัวอักษรลงเล็กน้อย
+            ),
+          ),
+          subtitle: Row(
+            children: [
+              Icon(Icons.people, size: 14, color: Colors.grey[600]),
+              const SizedBox(width: 4),
+              Text(
+                '${data['memberCount']?.toString() ?? '0'} members',
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              ),
+              if (isCreator) ...[
+                const SizedBox(width: 8),
+                Icon(Icons.star, size: 14, color: Colors.amber),
+                const SizedBox(width: 4),
+                Text(
+                  'Creator',
+                  style: TextStyle(
+                    color: Colors.amber[700],
+                    fontWeight: FontWeight.w500,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (data['description']?.toString().isNotEmpty ?? false)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Text(
-                  data['description']?.toString() ?? '',
-                  style: TextStyle(color: Colors.grey[600]),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            Row(
-              children: [
-                Icon(Icons.people, size: 16, color: Colors.grey[600]),
-                SizedBox(width: 4),
-                Text(
-                  '${data['memberCount']?.toString() ?? '0'} members',
-                  style: TextStyle(color: Colors.grey[600]),
-                ),
-                if (isCreator) ...[
-                  SizedBox(width: 8),
-                  Icon(Icons.star, size: 16, color: Colors.amber),
-                  SizedBox(width: 4),
-                  Text(
-                    'Creator',
-                    style: TextStyle(
-                      color: Colors.amber[700],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ],
-        ),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => GroupDetailScreen(
-                groupId: group.id,
-                username: widget.username,
-                userEmail: widget.userEmail,
-              ),
-            ),
-          );
-        },
       ),
     );
   }
@@ -153,16 +127,16 @@ class _GroupPageState extends State<GroupPage> {
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('ยืนยันการลบกลุ่ม'),
-        content: Text('คุณต้องการลบกลุ่มนี้ใช่หรือไม่?'),
+        title: const Text('ยืนยันการลบกลุ่ม'),
+        content: const Text('คุณต้องการลบกลุ่มนี้ใช่หรือไม่?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text('ยกเลิก'),
+            child: const Text('ยกเลิก'),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text('ลบ', style: TextStyle(color: Colors.red)),
+            child: const Text('ลบ', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -178,7 +152,7 @@ class _GroupPageState extends State<GroupPage> {
         title: const Text('Group List', style: TextStyle(color: Colors.white)),
         elevation: 0,
         actions: [
-          NotificationWidget(userEmail: widget.userEmail), // เปลี่ยนชื่อ class
+          NotificationWidget(userEmail: widget.userEmail),
         ],
       ),
       body: Column(
@@ -261,17 +235,24 @@ class _GroupPageState extends State<GroupPage> {
                         key: Key(groups[index].id),
                         direction: DismissDirection.endToStart,
                         background: Container(
+                          height: 85, // ต้องเท่ากับความสูงของ Card
+                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           alignment: Alignment.centerRight,
-                          padding: EdgeInsets.symmetric(horizontal: 20),
-                          color: Colors.red,
-                          child: Icon(Icons.delete, color: Colors.white),
+                          padding: const EdgeInsets.only(right: 16),
+                          child: const Icon(
+                            Icons.delete,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                         ),
-                        confirmDismiss: (direction) =>
-                            _showDeleteConfirmDialog(),
+                        confirmDismiss: (direction) => _showDeleteConfirmDialog(),
                         onDismissed: (direction) async {
                           try {
-                            final data =
-                                groups[index].data() as Map<String, dynamic>;
+                            final data = groups[index].data() as Map<String, dynamic>;
                             if (data['creatorEmail'] == widget.userEmail) {
                               await FirebaseFirestore.instance
                                   .collection('groups')
@@ -279,22 +260,34 @@ class _GroupPageState extends State<GroupPage> {
                                   .delete();
 
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('ลบกลุ่มเรียบร้อยแล้ว')),
+                                const SnackBar(content: Text('ลบกลุ่มเรียบร้อยแล้ว')),
                               );
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                    content: Text('คุณไม่มีสิทธิ์ลบกลุ่มนี้')),
+                                const SnackBar(content: Text('คุณไม่มีสิทธิ์ลบกลุ่มนี้')),
                               );
                             }
                           } catch (e) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content: Text('เกิดข้อผิดพลาดในการลบกลุ่ม')),
+                              const SnackBar(content: Text('เกิดข้อผิดพลาดในการลบกลุ่ม')),
                             );
                           }
                         },
-                        child: _buildGroupCard(groups[index]),
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => GroupDetailScreen(
+                                  groupId: groups[index].id,
+                                  username: widget.username,
+                                  userEmail: widget.userEmail,
+                                ),
+                              ),
+                            );
+                          },
+                          child: _buildGroupCard(groups[index]),
+                        ),
                       );
                     },
                   );
@@ -327,73 +320,77 @@ class _GroupPageState extends State<GroupPage> {
           style: TextStyle(color: Colors.white),
         ),
       ),
-      bottomNavigationBar: MotionTabBar(
-        labels: const ["Home", "Account", "Notes", "Calendar", "Groups"],
-        icons: const [
-          Icons.home,
-          Icons.person,
-          Icons.book,
-          Icons.calendar_today,
-          Icons.group
-        ],
-        initialSelectedTab: "Groups",
-        tabIconColor: const Color(0xFF0C5217),
-        tabSelectedColor: Colors.green,
-        onTabItemSelected: (int index) {
-          setState(() {
-            _currentIndex = index;
-          });
-          switch (index) {
-            case 0:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => HomePage(
-                    username: widget.username,
-                    userEmail: widget.userEmail,
-                  ),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return MotionTabBar(
+      labels: const ["Home", "Account", "Notes", "Calendar", "Groups"],
+      icons: const [
+        Icons.home,
+        Icons.person,
+        Icons.book,
+        Icons.calendar_today,
+        Icons.group
+      ],
+      initialSelectedTab: "Groups",
+      tabIconColor: const Color(0xFF0C5217),
+      tabSelectedColor: Colors.green,
+      onTabItemSelected: (int index) {
+        setState(() {
+          _currentIndex = index;
+        });
+        switch (index) {
+          case 0:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HomePage(
+                  username: widget.username,
+                  userEmail: widget.userEmail,
                 ),
-              );
-              break;
-            case 1:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AccountPage(
-                    initialUsername: widget.username,
-                    userEmail: widget.userEmail,
-                  ),
+              ),
+            );
+            break;
+          case 1:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AccountPage(
+                  initialUsername: widget.username,
+                  userEmail: widget.userEmail,
                 ),
-              );
-              break;
-            case 2:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => NotePage(
-                    username: widget.username,
-                    userEmail: widget.userEmail,
-                  ),
+              ),
+            );
+            break;
+          case 2:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => NotePage(
+                  username: widget.username,
+                  userEmail: widget.userEmail,
                 ),
-              );
-              break;
-            case 3:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CalendarPage(
-                    username: widget.username,
-                    userEmail: widget.userEmail,
-                  ),
+              ),
+            );
+            break;
+          case 3:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CalendarPage(
+                  username: widget.username,
+                  userEmail: widget.userEmail,
                 ),
-              );
-              break;
-            case 4:
-              // Already in Group page
-              break;
-          }
-        },
-      ),
+              ),
+            );
+            break;
+          case 4:
+            // Already in Group page
+            break;
+        }
+      },
     );
   }
 
