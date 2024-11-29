@@ -27,11 +27,10 @@ class _GroupMembersTabState extends State<GroupMembersTab> {
   @override
   void initState() {
     super.initState();
-    // ตรวจสอบสถานะสมาชิกเมื่อเปิดหน้า
     verifyMemberInGroup(widget.groupId, widget.currentEmail).then((isValid) {
       if (!isValid && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('คุณไม่ได้เป็นสมาชิกของกลุ่มนี้')),
+          const SnackBar(content: Text('You are not a member of this group')),
         );
         Navigator.pop(context);
       }
@@ -72,15 +71,15 @@ class _GroupMembersTabState extends State<GroupMembersTab> {
       await showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text('เพิ่มสมาชิก'),
+          title: const Text('Add Member'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: emailController,
-                decoration: InputDecoration(
-                  labelText: 'อีเมล',
-                  hintText: 'ระบุอีเมลที่ต้องการเชิญ',
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  hintText: 'Enter email to invite',
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.emailAddress,
@@ -90,78 +89,79 @@ class _GroupMembersTabState extends State<GroupMembersTab> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('ยกเลิก'),
+              child: const Text('Cancel'),
             ),
             TextButton(
-              onPressed: () async {
-                final email = emailController.text.trim();
-                if (email.isEmpty) return;
-
-                try {
-                  final userQuery = await FirebaseFirestore.instance
-                      .collection('users')
-                      .where('email', isEqualTo: email)
-                      .get();
-
-                  if (userQuery.docs.isEmpty) {
-                    throw Exception('ไม่พบผู้ใช้นี้ในระบบ');
-                  }
-
-                  final existingMember = await FirebaseFirestore.instance
-                      .collection('groups')
-                      .doc(widget.groupId)
-                      .collection('members')
-                      .where('email', isEqualTo: email)
-                      .get();
-
-                  if (existingMember.docs.isNotEmpty) {
-                    throw Exception('มีสมาชิกนี้อยู่ในกลุ่มแล้ว');
-                  }
-
-                  await FirebaseFirestore.instance
-                      .collection('groups')
-                      .doc(widget.groupId)
-                      .collection('members')
-                      .add({
-                    'email': email,
-                    'role': 'member',
-                    'status': 'pending',
-                    'invitedBy': widget.currentEmail,
-                    'invitedAt': FieldValue.serverTimestamp(),
-                  });
-
-                  Navigator.pop(context);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('ส่งคำเชิญเรียบร้อยแล้ว')),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(e.toString())),
-                    );
-                  }
-                }
-              },
-              child: Text('เชิญ'),
+              onPressed: () => _processInvitation(emailController.text.trim()),
+              child: const Text('Invite'),
             ),
           ],
         ),
       );
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _processInvitation(String email) async {
+    if (email.isEmpty) return;
+
+    try {
+      final userQuery = await FirebaseFirestore.instance
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .get();
+
+      if (userQuery.docs.isEmpty) {
+        throw Exception('User not found in system');
+      }
+
+      final existingMember = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('members')
+          .where('email', isEqualTo: email)
+          .get();
+
+      if (existingMember.docs.isNotEmpty) {
+        throw Exception('Member already exists in group');
+      }
+
+      await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('members')
+          .add({
+        'email': email,
+        'role': 'member',
+        'status': 'pending',
+        'invitedBy': widget.currentEmail,
+        'invitedAt': FieldValue.serverTimestamp(),
+      });
+
+      Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invitation sent successfully')),
+        );
+      }
+    } catch (e) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString())),
+      );
     }
   }
 
   Future<void> _updateMemberRole(String memberId, String newRole) async {
     try {
-      // เช็คว่าเป็น Creator หรือไม่
       final groupDoc = await FirebaseFirestore.instance
           .collection('groups')
           .doc(widget.groupId)
           .get();
+
       final memberDoc = await FirebaseFirestore.instance
           .collection('groups')
           .doc(widget.groupId)
@@ -172,8 +172,7 @@ class _GroupMembersTabState extends State<GroupMembersTab> {
       if (memberDoc.data()?['email'] == groupDoc.data()?['creatorEmail']) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text('ไม่สามารถเปลี่ยนแปลงบทบาทของผู้สร้างกลุ่มได้')),
+            const SnackBar(content: Text("Cannot change creator's role")),
           );
         }
         return;
@@ -188,80 +187,160 @@ class _GroupMembersTabState extends State<GroupMembersTab> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('อัปเดตบทบาทสำเร็จ')),
+          const SnackBar(content: Text('Role updated successfully')),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
+          SnackBar(content: Text('Error: $e')),
         );
       }
     }
+  }
+
+  Widget _buildLeadingImage(DocumentSnapshot member) {
+    return SizedBox(
+      width: 40,
+      height: 40,
+      child: FutureBuilder<QuerySnapshot>(
+        key: ValueKey('member_${member.id}'),
+        future: FirebaseFirestore.instance
+            .collection('users')
+            .where('email', isEqualTo: member['email'])
+            .get(),
+        builder: (context, snapshot) {
+          if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+            final userData =
+                snapshot.data!.docs.first.data() as Map<String, dynamic>;
+            final accountImageUrl = userData['profileImageUrl'];
+
+            return ClipOval(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  shape: BoxShape.circle,
+                ),
+                child: accountImageUrl != null && accountImageUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: accountImageUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) =>
+                            const CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Color(0xFF0C5217)),
+                        ),
+                        errorWidget: (context, url, error) => Icon(
+                          Icons.person,
+                          color: Colors.grey[600],
+                          size: 24,
+                        ),
+                      )
+                    : Icon(
+                        Icons.person,
+                        color: Colors.grey[600],
+                        size: 24,
+                      ),
+              ),
+            );
+          }
+          return ClipOval(
+            child: Container(
+              color: Colors.grey[200],
+              child: Icon(
+                Icons.person,
+                color: Colors.grey[600],
+                size: 24,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildTitle(DocumentSnapshot member) {
+    return FutureBuilder<QuerySnapshot>(
+      future: FirebaseFirestore.instance
+          .collection('users')
+          .where('email', isEqualTo: member['email'])
+          .limit(1)
+          .get(),
+      builder: (context, userSnapshot) {
+        if (userSnapshot.hasData && userSnapshot.data!.docs.isNotEmpty) {
+          final userData =
+              userSnapshot.data!.docs.first.data() as Map<String, dynamic>;
+          return Text(userData['username'] ?? 'Not specified');
+        }
+        return const Text('Loading...');
+      },
+    );
+  }
+
+  Widget _buildTrailingMenu(DocumentSnapshot member, bool isAdmin) {
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .get(),
+      builder: (context, groupSnapshot) {
+        if (groupSnapshot.hasData) {
+          final groupData = groupSnapshot.data!.data() as Map<String, dynamic>;
+          final bool isCreator = member['email'] == groupData['creatorEmail'];
+
+          if (isCreator) {
+            return const SizedBox.shrink();
+          }
+
+          return PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'role') {
+                _updateMemberRole(
+                  member.id,
+                  isAdmin ? 'member' : 'admin',
+                );
+              } else if (value == 'remove') {
+                _showRemoveConfirmation(member);
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'role',
+                child: Text(
+                  isAdmin ? 'Demote to Member' : 'Promote to Admin',
+                ),
+              ),
+              PopupMenuItem(
+                value: 'remove',
+                child: Text(
+                  'Remove from Group',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          );
+        }
+        return const SizedBox.shrink();
+      },
+    );
   }
 
   void _showRemoveConfirmation(DocumentSnapshot member) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('นำออกจากกลุ่ม'),
-        content: Text('คุณต้องการนำ ${member['email']} ออกจากกลุ่มหรือไม่?'),
+        title: const Text('Remove from Group'),
+        content:
+            Text('Do you want to remove ${member['email']} from the group?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('ยกเลิก'),
+            child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () async {
-              try {
-                // Check if member is Creator
-                final groupDoc = await FirebaseFirestore.instance
-                    .collection('groups')
-                    .doc(widget.groupId)
-                    .get();
-
-                if (member['email'] == groupDoc.data()?['creatorEmail']) {
-                  Navigator.pop(context);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('ไม่สามารถลบผู้สร้างกลุ่มได้')),
-                    );
-                  }
-                  return;
-                }
-
-                WriteBatch batch = FirebaseFirestore.instance.batch();
-
-                batch.delete(member.reference);
-
-                batch.update(
-                  FirebaseFirestore.instance
-                      .collection('groups')
-                      .doc(widget.groupId),
-                  {
-                    'memberCount': FieldValue.increment(-1),
-                    'memberEmails': FieldValue.arrayRemove([member['email']]),
-                  },
-                );
-
-                await batch.commit();
-
-                Navigator.pop(context);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('ลบสมาชิกสำเร็จ')),
-                  );
-                }
-              } catch (e) {
-                Navigator.pop(context);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('เกิดข้อผิดพลาด: $e')),
-                  );
-                }
-              }
-            },
-            child: Text('ยืนยัน'),
+            onPressed: () => _removeMember(member),
+            child: const Text('Confirm'),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
           ),
         ],
@@ -269,17 +348,62 @@ class _GroupMembersTabState extends State<GroupMembersTab> {
     );
   }
 
+  Future<void> _removeMember(DocumentSnapshot member) async {
+    try {
+      final groupDoc = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .get();
+
+      if (member['email'] == groupDoc.data()?['creatorEmail']) {
+        Navigator.pop(context);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Cannot remove group creator')),
+          );
+        }
+        return;
+      }
+
+      WriteBatch batch = FirebaseFirestore.instance.batch();
+      batch.delete(member.reference);
+      batch.update(
+        FirebaseFirestore.instance.collection('groups').doc(widget.groupId),
+        {
+          'memberCount': FieldValue.increment(-1),
+          'memberEmails': FieldValue.arrayRemove([member['email']]),
+        },
+      );
+
+      await batch.commit();
+
+      Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Member removed successfully')),
+        );
+      }
+    } catch (e) {
+      Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         Container(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'สมาชิก',
+              const Text(
+                'Members',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w500,
@@ -288,14 +412,14 @@ class _GroupMembersTabState extends State<GroupMembersTab> {
               if (widget.isAdmin)
                 IconButton(
                   icon: _isLoading
-                      ? SizedBox(
+                      ? const SizedBox(
                           width: 24,
                           height: 24,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
                           ),
                         )
-                      : Icon(Icons.person_add),
+                      : const Icon(Icons.person_add),
                   onPressed: _isLoading ? null : _inviteMember,
                   color: const Color(0xFF0C5217),
                 ),
@@ -304,178 +428,71 @@ class _GroupMembersTabState extends State<GroupMembersTab> {
         ),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-              stream: _membersStream,
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                      child: Text('เกิดข้อผิดพลาด: ${snapshot.error}'));
-                }
+            stream: _membersStream,
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(child: Text('Error: ${snapshot.error}'));
+              }
 
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator());
-                }
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-                final members = snapshot.data?.docs ?? [];
+              final members = snapshot.data?.docs ?? [];
 
-                if (members.isEmpty) {
-                  return Center(child: Text('ไม่มีสมาชิกในกลุ่ม'));
-                }
+              if (members.isEmpty) {
+                return const Center(child: Text('No members in group'));
+              }
 
-                return ListView.builder(
-                  itemCount: members.length,
-                  itemBuilder: (context, index) {
-                    final member = members[index];
-                    final isAdmin = member['role'] == 'admin';
-                    final bool isCurrentUser =
-                        member['email'] == widget.currentEmail;
+              return ListView.builder(
+                itemCount: members.length,
+                itemBuilder: (context, index) {
+                  final member = members[index];
+                  final isAdmin = member['role'] == 'admin';
+                  final bool isCurrentUser =
+                      member['email'] == widget.currentEmail;
 
-                    return Card(
-                      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      child: ListTile(
-                        leading: SizedBox(
-                          width: 40,
-                          height: 40,
-                          child: FutureBuilder<DocumentSnapshot>(
-                            future: FirebaseFirestore.instance
-                                .collection('users')
-                                .where('email', isEqualTo: member['email'])
-                                .get()
-                                .then((value) => value.docs.first),
-                            builder: (context, snapshot) {
-                              if (snapshot.hasData && snapshot.data != null) {
-                                final userData = snapshot.data!.data()
-                                    as Map<String, dynamic>;
-                                final accountImageUrl =
-                                    userData['profileImageUrl'];
-
-                                return ClipOval(
-                                  child: accountImageUrl != null &&
-                                          accountImageUrl.isNotEmpty
-                                      ? CachedNetworkImage(
-                                          imageUrl: accountImageUrl,
-                                          fit: BoxFit.cover,
-                                          placeholder: (context, url) =>
-                                              CircularProgressIndicator(),
-                                          errorWidget: (context, url, error) =>
-                                              Icon(
-                                            Icons.person,
-                                            color: Colors.grey[600],
-                                            size: 24,
-                                          ),
-                                        )
-                                      : Icon(
-                                          Icons.person,
-                                          color: Colors.grey[600],
-                                          size: 24,
-                                        ),
-                                );
-                              }
-                              return Icon(
-                                Icons.person,
-                                color: Colors.grey[600],
-                                size: 24,
-                              );
-                            },
-                          ),
-                        ),
-                        title: FutureBuilder<QuerySnapshot>(
-                          future: FirebaseFirestore.instance
-                              .collection('users')
-                              .where('email', isEqualTo: member['email'])
-                              .get(),
-                          builder: (context, userSnapshot) {
-                            if (userSnapshot.hasData &&
-                                userSnapshot.data!.docs.isNotEmpty) {
-                              final userData = userSnapshot.data!.docs.first
-                                  .data() as Map<String, dynamic>;
-                              return Text(
-                                  userData['username'] ?? 'ไม่ระบุชื่อ');
-                            }
-                            return Text(member['email']);
-                          },
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(member['email']),
-                            SizedBox(height: 4),
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
+                  return Card(
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: ListTile(
+                      leading: _buildLeadingImage(member),
+                      title: _buildTitle(member),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(member['email']),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isAdmin
+                                  ? Colors.green[100]
+                                  : Colors.grey[100],
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              isAdmin ? 'Admin' : 'Member',
+                              style: TextStyle(
+                                fontSize: 12,
                                 color: isAdmin
-                                    ? Colors.green[100]
-                                    : Colors.grey[100],
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                isAdmin ? 'Admin' : 'Member',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isAdmin
-                                      ? const Color(0xFF0C5217)
-                                      : Colors.grey[600],
-                                ),
+                                    ? const Color(0xFF0C5217)
+                                    : Colors.grey[600],
                               ),
                             ),
-                          ],
-                        ),
-                        trailing: widget.isAdmin && !isCurrentUser
-                            ? FutureBuilder<DocumentSnapshot>(
-                                future: FirebaseFirestore.instance
-                                    .collection('groups')
-                                    .doc(widget.groupId)
-                                    .get(),
-                                builder: (context, groupSnapshot) {
-                                  if (groupSnapshot.hasData) {
-                                    final groupData = groupSnapshot.data!.data()
-                                        as Map<String, dynamic>;
-                                    final bool isCreator = member['email'] ==
-                                        groupData['creatorEmail'];
-
-                                    if (isCreator) {
-                                      return null;
-                                    }
-
-                                    return PopupMenuButton<String>(
-                                      onSelected: (value) {
-                                        if (value == 'role') {
-                                          _updateMemberRole(
-                                            member.id,
-                                            isAdmin ? 'member' : 'admin',
-                                          );
-                                        } else if (value == 'remove') {
-                                          _showRemoveConfirmation(member);
-                                        }
-                                      },
-                                      itemBuilder: (context) => [
-                                        PopupMenuItem(
-                                          value: 'role',
-                                          child: Text(
-                                            isAdmin
-                                                ? 'ลดระดับเป็นสมาชิก'
-                                                : 'เลื่อนระดับเป็นผู้ดูแล',
-                                          ),
-                                        ),
-                                        PopupMenuItem(
-                                          value: 'remove',
-                                          child: Text(
-                                            'นำออกจากกลุ่ม',
-                                            style: TextStyle(color: Colors.red),
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  }
-                                  return null;
-                                },
-                              )
-                            : null,
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                );
-              }),
+                      trailing: widget.isAdmin && !isCurrentUser
+                          ? _buildTrailingMenu(member, isAdmin)
+                          : null,
+                    ),
+                  );
+                },
+              );
+            },
+          ),
         ),
       ],
     );
