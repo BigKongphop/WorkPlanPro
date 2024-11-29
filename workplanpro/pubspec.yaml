@@ -54,7 +54,7 @@ dependencies:
   local_auth: ^2.3.0
 
   rxdart: ^0.27.7
-  
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -67,5 +67,7 @@ flutter:
     - assets/animation/animation_login_2.json
     - assets/animation/animation_login_3.json
     - assets/animation/loading.json
-
-
+    - assets/group_images/
+    - assets/group_images/default1.png 
+    - assets/group_images/default2.png
+    - assets/group_images/default3.png

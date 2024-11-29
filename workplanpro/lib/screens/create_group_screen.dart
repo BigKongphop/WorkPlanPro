@@ -1,9 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
-import './choose_group_image_screen.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   final String currentUsername;
@@ -21,55 +17,37 @@ class CreateGroupScreen extends StatefulWidget {
 
 class _CreateGroupScreenState extends State<CreateGroupScreen> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _descriptionController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
   bool _isLoading = false;
   String? _nameError;
-  dynamic _selectedImage;
-
-  Future<String?> _uploadImage() async {
-    if (_selectedImage == null) return null;
-
-    try {
-      if (_selectedImage is File) {
-        final File imageFile = _selectedImage as File;
-        final String fileName =
-            DateTime.now().millisecondsSinceEpoch.toString() + '.jpg';
-        final Reference storageRef = FirebaseStorage.instance
-            .ref()
-            .child('group_images')
-            .child(fileName);
-
-        final UploadTask uploadTask = storageRef.putFile(imageFile);
-        final TaskSnapshot snapshot = await uploadTask;
-        return await snapshot.ref.getDownloadURL();
-      } else if (_selectedImage is String) {
-        return _selectedImage;
-      }
-    } catch (e) {
-      print('Error uploading image: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading image: $e')),
-        );
-      }
-      return null;
-    }
-    return null;
-  }
 
   Future<void> _createGroup() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
       _isLoading = true;
+      _nameError = null;
     });
 
     try {
-      // ตรวจสอบชื่อกลุ่มซ้ำ
-      final groupSnapshot = await FirebaseFirestore.instance
+      final firestore = FirebaseFirestore.instance;
+
+      // ดึงลำดับสูงสุดที่มีอยู่
+      final highestOrderDoc = await firestore
           .collection('groups')
-          .where('name', isEqualTo: _nameController.text.trim())
+          .orderBy('order', descending: true)
+          .limit(1)
+          .get();
+
+      int nextOrder = 0;
+      if (highestOrderDoc.docs.isNotEmpty) {
+        nextOrder = (highestOrderDoc.docs.first.data()['order'] ?? -1) + 1;
+      }
+      
+      final groupSnapshot = await firestore
+          .collection('groups')
+          .where('name', isEqualTo: _nameController.text)
           .get();
 
       if (groupSnapshot.docs.isNotEmpty) {
@@ -79,82 +57,41 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         return;
       }
 
-      // อัพโหลดรูปภาพ (ถ้ามี)
-      final String? imageUrl = await _uploadImage();
-
-      // สร้างกลุ่มใหม่
-      final docRef = await FirebaseFirestore.instance.collection('groups').add({
+      final docRef = await firestore.collection('groups').add({
         'name': _nameController.text.trim(),
         'description': _descriptionController.text.trim(),
         'creatorEmail': widget.currentEmail,
         'creatorName': widget.currentUsername,
-        'memberEmails': [widget.currentEmail], // เพิ่ม email ผู้สร้างเป็นสมาชิก
-        'memberCount': 1,
-        'imageUrl': imageUrl ?? '',
         'createdAt': FieldValue.serverTimestamp(),
+        'memberCount': 1,
+        'memberEmails': [widget.currentEmail],
+        'order': nextOrder, // เพิ่ม order field
       });
 
-      // เพิ่มผู้สร้างเป็นสมาชิกแบบ admin
-      await docRef.collection('members').add({
-        'email': widget.currentEmail,
-        'role': 'admin',
-        'status': 'accepted',
-        'joinedAt': FieldValue.serverTimestamp(),
-      });
-
-      // อัพเดท id ของกลุ่ม
       await docRef.update({'id': docRef.id});
 
-      // ปิดหน้าสร้างกลุ่มและกลับไปหน้า list
-      if (mounted) {
-        Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Group created successfully')),
-        );
-      }
-    } catch (e) {
-      print('Error creating group: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error creating group: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
+      // Add creator as admin member
+      final memberRef = docRef.collection('members').doc();
+      await memberRef.set({
+        'email': widget.currentEmail,
+        'role': 'admin',
+        'joinedAt': FieldValue.serverTimestamp(),
+        'status': 'accepted'
+      });
 
-  void _showImagePicker() async {
-    try {
-      final result = await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ChooseGroupImageScreen(
-            currentImage: _selectedImage is String ? _selectedImage : null,
-            onImageSelected: (image) {
-              if (mounted) {
-                setState(() => _selectedImage = image);
-              }
-            },
-          ),
-        ),
+      Navigator.pop(context, true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Group created successfully')),
       );
-
-      if (result != null && mounted) {
-        setState(() {
-          _selectedImage = result;
-        });
-      }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error selecting image: $e')),
-        );
-      }
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error creating group: $e')),
+      );
     }
   }
+
+  
 
   @override
   Widget build(BuildContext context) {
@@ -179,36 +116,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Center(
-                  child: GestureDetector(
-                    onTap: _showImagePicker,
-                    child: Container(
-                      width: 120,
-                      height: 120,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        shape: BoxShape.circle,
-                        image: _selectedImage != null
-                            ? DecorationImage(
-                                fit: BoxFit.cover,
-                                image: _selectedImage is File
-                                    ? FileImage(_selectedImage as File)
-                                    : AssetImage(_selectedImage as String)
-                                        as ImageProvider,
-                              )
-                            : null,
-                      ),
-                      child: _selectedImage == null
-                          ? Icon(
-                              Icons.add_photo_alternate,
-                              size: 40,
-                              color: Colors.grey,
-                            )
-                          : null,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 24),
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(

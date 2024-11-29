@@ -33,7 +33,7 @@ class _ChooseGroupImageScreenState extends State<ChooseGroupImageScreen> {
         maxHeight: 1024,
         imageQuality: 85,
       );
-      
+
       if (image != null) {
         final File imageFile = File(image.path);
         if (await imageFile.exists()) {
@@ -63,91 +63,62 @@ class _ChooseGroupImageScreenState extends State<ChooseGroupImageScreen> {
           style: TextStyle(color: Colors.white),
         ),
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'Choose from gallery or camera',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              'Default Images',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            ListTile(
-              leading: CircleAvatar(
-                backgroundColor: Color(0xFF0C5217),
-                child: Icon(Icons.photo_library, color: Colors.white),
-              ),
-              title: Text('Choose from Gallery'),
-              onTap: () => _pickImage(ImageSource.gallery),
+          ),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
             ),
-            ListTile(
-              leading: CircleAvatar(
-                backgroundColor: Color(0xFF0C5217),
-                child: Icon(Icons.camera_alt, color: Colors.white),
-              ),
-              title: Text('Take a Photo'),
-              onTap: () => _pickImage(ImageSource.camera),
-            ),
-            Divider(),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'Default Images',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-              ),
-              itemCount: defaultImages.length,
-              itemBuilder: (context, index) {
-                return InkWell(
-                  onTap: () {
-                    widget.onImageSelected(defaultImages[index]);
-                    Navigator.pop(context, defaultImages[index]);
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.grey[300]!,
-                        width: 2,
-                      ),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.asset(
-                        defaultImages[index],
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          print('Error loading image: $error');
-                          return Container(
-                            color: Colors.grey[200],
-                            child: Icon(Icons.error, color: Colors.red),
-                          );
-                        },
-                      ),
+            itemCount: defaultImages.length,
+            itemBuilder: (context, index) {
+              return InkWell(
+                onTap: () {
+                  widget.onImageSelected(defaultImages[index]);
+                  Navigator.pop(context, defaultImages[index]);
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.grey[300]!,
+                      width: 2,
                     ),
                   ),
-                );
-              },
-            ),
-          ],
-        ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.asset(
+                      defaultImages[index],
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        print('Error loading image: $error');
+                        return Container(
+                          color: Colors.grey[200],
+                          child: Icon(Icons.error, color: Colors.red),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              );
+            },
+          )
+        ],
       ),
     );
   }

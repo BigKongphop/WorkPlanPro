@@ -254,27 +254,47 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              groupData?['name'] ?? 'Group',
-              style: TextStyle(color: Colors.white),
-            ),
-            Text(
-              groupData?['description'] ?? '',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 12,
-              ),
-            ),
-          ],
+        title: StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('groups')
+              .doc(widget.groupId)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasData && snapshot.data?.data() != null) {
+              final data = snapshot.data!.data() as Map<String, dynamic>;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${data['name']} (${data['memberCount'] ?? 0})',
+                          style: TextStyle(color: Colors.white),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (data['description']?.isNotEmpty ?? false)
+                    Text(
+                      data['description'],
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              );
+            }
+            return Text('Loading...', style: TextStyle(color: Colors.white));
+          },
         ),
         actions: [
           IconButton(
             icon: Icon(Icons.settings, color: Colors.white),
             onPressed: () async {
-              // ดึงข้อมูลกลุ่มก่อน
               final groupDoc = await FirebaseFirestore.instance
                   .collection('groups')
                   .doc(widget.groupId)

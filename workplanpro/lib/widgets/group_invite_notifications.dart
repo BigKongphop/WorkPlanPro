@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class NotificationWidget extends StatefulWidget {
   final String userEmail;
 
   const NotificationWidget({
-    Key? key, 
+    Key? key,
     required this.userEmail,
   }) : super(key: key);
 
@@ -53,7 +54,8 @@ class _NotificationWidgetState extends State<NotificationWidget> {
     }
   }
 
-  Future<void> _handleInvitation(String groupId, String memberId, bool accept) async {
+  Future<void> _handleInvitation(
+      String groupId, String memberId, bool accept) async {
     if (!mounted) return;
 
     try {
@@ -62,8 +64,9 @@ class _NotificationWidgetState extends State<NotificationWidget> {
 
       // เริ่ม batch operation
       WriteBatch batch = FirebaseFirestore.instance.batch();
-      
-      final groupRef = FirebaseFirestore.instance.collection('groups').doc(groupId);
+
+      final groupRef =
+          FirebaseFirestore.instance.collection('groups').doc(groupId);
       final memberRef = groupRef.collection('members').doc(memberId);
 
       if (accept) {
@@ -107,7 +110,6 @@ class _NotificationWidgetState extends State<NotificationWidget> {
 
       // โหลดข้อมูลใหม่
       await _loadInvitations();
-
     } catch (e) {
       print('Error handling invitation: $e');
       if (mounted) {
@@ -142,130 +144,181 @@ class _NotificationWidgetState extends State<NotificationWidget> {
       children: [
         IconButton(
           icon: Icon(
-            _invitations?.isEmpty ?? true 
-                ? Icons.notifications_none 
+            _invitations?.isEmpty ?? true
+                ? Icons.notifications_none
                 : Icons.notifications_active,
             color: Colors.white,
           ),
-          onPressed: (_invitations?.isEmpty ?? true) ? null : () async {
-            // ดึงข้อมูลกลุ่มทั้งหมดที่เกี่ยวข้องกับคำเชิญ
-            final groupsData = await Future.wait(
-              _invitations!.map((invitation) async {
-                final groupId = invitation.reference.parent.parent!.id;
-                final groupDoc = await FirebaseFirestore.instance
-                    .collection('groups')
-                    .doc(groupId)
-                    .get();
-                return {
-                  'invitation': invitation,
-                  'group': groupDoc
-                };
-              })
-            );
+          onPressed: (_invitations?.isEmpty ?? true)
+              ? null
+              : () async {
+                  final groupsData =
+                      await Future.wait(_invitations!.map((invitation) async {
+                    final groupId = invitation.reference.parent.parent!.id;
+                    final groupDoc = await FirebaseFirestore.instance
+                        .collection('groups')
+                        .doc(groupId)
+                        .get();
+                    return {'invitation': invitation, 'group': groupDoc};
+                  }));
 
-            if (!mounted) return;
+                  if (!mounted) return;
 
-            showModalBottomSheet(
-              context: context,
-              useRootNavigator: true,
-              backgroundColor: Colors.white,
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              builder: (BuildContext context) => StatefulBuilder(
-                builder: (context, setState) => Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'คำเชิญเข้าร่วมกลุ่ม',
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: const Color(0xFF0C5217),
-                              fontWeight: FontWeight.bold,
+                  showModalBottomSheet(
+                    context: context,
+                    useRootNavigator: true,
+                    backgroundColor: Colors.white,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(20)),
+                    ),
+                    builder: (BuildContext context) => StatefulBuilder(
+                      builder: (context, setState) => Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'คำเชิญเข้าร่วมกลุ่ม',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleLarge
+                                      ?.copyWith(
+                                        color: const Color(0xFF0C5217),
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close),
+                                  onPressed: () => Navigator.pop(context),
+                                ),
+                              ],
                             ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close),
-                            onPressed: () => Navigator.pop(context),
-                          ),
-                        ],
-                      ),
-                      const Divider(),
-                      const SizedBox(height: 8),
-                      Flexible(
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: groupsData.length,
-                          itemBuilder: (context, index) {
-                            final data = groupsData[index];
-                            final groupDoc = data['group'] as DocumentSnapshot;
-                            final invitation = data['invitation'] as QueryDocumentSnapshot;
-                            
-                            return Card(
-                              elevation: 2,
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: const Color(0xFF0C5217),
-                                  child: Icon(Icons.group, color: Colors.white),
-                                ),
-                                title: Text(
-                                  groupDoc['name'] ?? 'Unknown Group',
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('From: ${groupDoc['creatorName'] ?? 'Unknown'}'),
-                                    Text(
-                                      'Invited at: ${_formatDate(invitation['invitedAt'] as Timestamp)}',
-                                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            const Divider(),
+                            const SizedBox(height: 8),
+                            Flexible(
+                                child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: groupsData.length,
+                              itemBuilder: (context, index) {
+                                final data = groupsData[index];
+                                final groupDoc =
+                                    data['group'] as DocumentSnapshot;
+                                final invitation =
+                                    data['invitation'] as QueryDocumentSnapshot;
+                                final groupData =
+                                    groupDoc.data() as Map<String, dynamic>;
+
+                                return Card(
+                                  margin: const EdgeInsets.all(8),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(15),
+                                  ),
+                                  child: ListTile(
+                                    contentPadding: const EdgeInsets.all(8),
+                                    leading: FutureBuilder(
+                                      future: FirebaseFirestore.instance
+                                          .collection('groups')
+                                          .doc(groupDoc.id)
+                                          .get(),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.hasData &&
+                                            snapshot.data != null) {
+                                          final Map<String, dynamic>?
+                                              groupData = snapshot.data!.data()
+                                                  as Map<String, dynamic>?;
+                                          final String? imageUrl =
+                                              groupData?['imageUrl'];
+
+                                          return CircleAvatar(
+                                            radius: 25,
+                                            backgroundColor: Color(0xFF0C5217),
+                                            backgroundImage: imageUrl != null &&
+                                                    imageUrl.isNotEmpty
+                                                ? (imageUrl
+                                                        .startsWith('assets/')
+                                                    ? AssetImage(imageUrl)
+                                                        as ImageProvider
+                                                    : CachedNetworkImageProvider(
+                                                        imageUrl))
+                                                : null,
+                                            child: imageUrl == null ||
+                                                    imageUrl.isEmpty
+                                                ? Icon(Icons.group,
+                                                    color: Colors.white)
+                                                : null,
+                                          );
+                                        }
+                                        return CircleAvatar(
+                                          radius: 25,
+                                          backgroundColor: Color(0xFF0C5217),
+                                          child: Icon(Icons.group,
+                                              color: Colors.white),
+                                        );
+                                      },
                                     ),
-                                  ],
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    TextButton(
-                                      child: const Text(
-                                        'รับ',
-                                        style: TextStyle(color: Colors.green),
-                                      ),
-                                      onPressed: () => _handleInvitation(
-                                        groupDoc.id,
-                                        invitation.id,
-                                        true,
+                                    title: Text(
+                                      groupData['name']?.toString() ??
+                                          'Unknown Group',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
                                       ),
                                     ),
-                                    TextButton(
-                                      child: const Text(
-                                        'ปฏิเสธ',
-                                        style: TextStyle(color: Colors.red),
-                                      ),
-                                      onPressed: () => _handleInvitation(
-                                        groupDoc.id,
-                                        invitation.id,
-                                        false,
-                                      ),
+                                    subtitle: Text(
+                                        'From: ${groupData['creatorName'] ?? 'Unknown'}'),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        TextButton(
+                                          style: TextButton.styleFrom(
+                                            backgroundColor:
+                                                Colors.green.withOpacity(0.1),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                            ),
+                                          ),
+                                          onPressed: () => _handleInvitation(
+                                              groupDoc.id, invitation.id, true),
+                                          child: const Text('รับ',
+                                              style: TextStyle(
+                                                  color: Colors.green)),
+                                        ),
+                                        SizedBox(width: 8),
+                                        TextButton(
+                                          style: TextButton.styleFrom(
+                                            backgroundColor:
+                                                Colors.red.withOpacity(0.1),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                            ),
+                                          ),
+                                          onPressed: () => _handleInvitation(
+                                              groupDoc.id,
+                                              invitation.id,
+                                              false),
+                                          child: const Text('ปฏิเสธ',
+                                              style:
+                                                  TextStyle(color: Colors.red)),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
+                                  ),
+                                );
+                              },
+                            )),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
+                    ),
+                  );
+                },
         ),
         if (_invitations?.isNotEmpty ?? false)
           Positioned(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:motion_tab_bar_v2/motion-tab-bar.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'note_page.dart';
 import 'account_page.dart';
 import 'calendar_page.dart';
@@ -34,17 +35,43 @@ class _GroupPageState extends State<GroupPage> {
   @override
   void initState() {
     super.initState();
+    _initializeGroupOrder();
     _initGroupsStream();
+  }
+
+  Future<void> _initializeGroupOrder() async {
+    try {
+      final QuerySnapshot groups = await FirebaseFirestore.instance
+          .collection('groups')
+          .where('memberEmails', arrayContains: widget.userEmail)
+          .get();
+
+      int order = 0;
+      final batch = FirebaseFirestore.instance.batch();
+
+      for (var doc in groups.docs) {
+        if ((doc.data() as Map<String, dynamic>)['order'] == null) {
+          batch.update(doc.reference, {'order': order});
+          order++;
+        }
+      }
+
+      await batch.commit();
+    } catch (e) {
+      print('Error initializing group order: $e');
+    }
   }
 
   void _initGroupsStream() {
     _groupsStream = FirebaseFirestore.instance
         .collection('groups')
         .where('memberEmails', arrayContains: widget.userEmail)
+        .orderBy('order', descending: false)
         .snapshots();
   }
 
-  List<QueryDocumentSnapshot> _filterGroups(List<QueryDocumentSnapshot> groups) {
+  List<QueryDocumentSnapshot> _filterGroups(
+      List<QueryDocumentSnapshot> groups) {
     if (_searchQuery.isEmpty) return groups;
     return groups.where((group) {
       final data = group.data() as Map<String, dynamic>;
@@ -59,6 +86,8 @@ class _GroupPageState extends State<GroupPage> {
     final data = group.data() as Map<String, dynamic>;
     final bool isCreator = data['creatorEmail'] == widget.userEmail;
 
+    print('Group image URL: ${data['imageUrl']}');
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
@@ -68,31 +97,51 @@ class _GroupPageState extends State<GroupPage> {
       child: SizedBox(
         height: 85,
         child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: ClipRRect(
-            borderRadius: BorderRadius.circular(25),
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: data['imageUrl'] != null && data['imageUrl'].toString().isNotEmpty
-                  ? Image.network(
-                      data['imageUrl'].toString(),
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          Icon(Icons.group, color: Colors.grey[400], size: 24),
-                    )
-                  : Icon(Icons.group, color: Colors.grey[400], size: 24),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          leading: Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(25),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(25),
+              child: data['imageUrl'] != null &&
+                      data['imageUrl'].toString().isNotEmpty
+                  ? (data['imageUrl'].toString().startsWith('assets/')
+                      ? Image.asset(
+                          data['imageUrl'],
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            print('Error loading asset image: $error');
+                            return Icon(Icons.group, color: Colors.grey[400]);
+                          },
+                        )
+                      : CachedNetworkImage(
+                          imageUrl: data['imageUrl'],
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFF0C5217),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) {
+                            print('Error loading network image: $error');
+                            return Icon(Icons.group, color: Colors.grey[400]);
+                          },
+                        ))
+                  : Icon(Icons.group, color: Colors.grey[400]),
             ),
           ),
           title: Text(
-            data['name']?.toString() ?? 'Unnamed Group',
+            data['name']?.toString().replaceAll(RegExp(r'\s*\(\d+\)'), '') ??
+                'Unnamed Group',
             style: const TextStyle(
               fontWeight: FontWeight.bold,
-              fontSize: 16, // ลดขนาดตัวอักษรลงเล็กน้อย
+              fontSize: 16,
             ),
           ),
           subtitle: Row(
@@ -118,6 +167,18 @@ class _GroupPageState extends State<GroupPage> {
               ],
             ],
           ),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => GroupDetailScreen(
+                  groupId: group.id,
+                  username: widget.username,
+                  userEmail: widget.userEmail,
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -191,15 +252,11 @@ class _GroupPageState extends State<GroupPage> {
                 stream: _groupsStream,
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
-                    return Center(
-                      child: Text('Error: ${snapshot.error}'),
-                    );
+                    return Center(child: Text('Error: ${snapshot.error}'));
                   }
 
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
+                    return const Center(child: CircularProgressIndicator());
                   }
 
                   final groups = _filterGroups(snapshot.data?.docs ?? []);
@@ -209,50 +266,68 @@ class _GroupPageState extends State<GroupPage> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.group_outlined,
-                            size: 64,
-                            color: Colors.grey[400],
-                          ),
+                          Icon(Icons.group_outlined,
+                              size: 64, color: Colors.grey[400]),
                           const SizedBox(height: 16),
                           Text(
                             'No groups found\nTap + to create a new group',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 16,
-                            ),
+                                color: Colors.grey[600], fontSize: 16),
                           ),
                         ],
                       ),
                     );
                   }
 
-                  return ListView.builder(
+                  return ReorderableListView.builder(
                     itemCount: groups.length,
+                    onReorder: (oldIndex, newIndex) async {
+                      if (oldIndex < newIndex) {
+                        newIndex -= 1;
+                      }
+
+                      try {
+                        final batch = FirebaseFirestore.instance.batch();
+                        final items = List<QueryDocumentSnapshot>.from(groups);
+                        final item = items.removeAt(oldIndex);
+                        items.insert(newIndex, item);
+
+                        // Update orders for all affected items
+                        for (var i = 0; i < items.length; i++) {
+                          batch.update(items[i].reference, {'order': i});
+                        }
+
+                        await batch.commit();
+                      } catch (e) {
+                        print('Error reordering: $e');
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text('Error updating group order')));
+                      }
+                    },
                     itemBuilder: (context, index) {
                       return Dismissible(
                         key: Key(groups[index].id),
                         direction: DismissDirection.endToStart,
                         background: Container(
-                          height: 85, // ต้องเท่ากับความสูงของ Card
-                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          height: 85,
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
                           decoration: BoxDecoration(
                             color: Colors.red,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           alignment: Alignment.centerRight,
                           padding: const EdgeInsets.only(right: 16),
-                          child: const Icon(
-                            Icons.delete,
-                            color: Colors.white,
-                            size: 20,
-                          ),
+                          child: const Icon(Icons.delete,
+                              color: Colors.white, size: 20),
                         ),
-                        confirmDismiss: (direction) => _showDeleteConfirmDialog(),
+                        confirmDismiss: (direction) =>
+                            _showDeleteConfirmDialog(),
                         onDismissed: (direction) async {
                           try {
-                            final data = groups[index].data() as Map<String, dynamic>;
+                            final data =
+                                groups[index].data() as Map<String, dynamic>;
                             if (data['creatorEmail'] == widget.userEmail) {
                               await FirebaseFirestore.instance
                                   .collection('groups')
@@ -260,34 +335,23 @@ class _GroupPageState extends State<GroupPage> {
                                   .delete();
 
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('ลบกลุ่มเรียบร้อยแล้ว')),
+                                const SnackBar(
+                                    content: Text('ลบกลุ่มเรียบร้อยแล้ว')),
                               );
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('คุณไม่มีสิทธิ์ลบกลุ่มนี้')),
+                                const SnackBar(
+                                    content: Text('คุณไม่มีสิทธิ์ลบกลุ่มนี้')),
                               );
                             }
                           } catch (e) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('เกิดข้อผิดพลาดในการลบกลุ่ม')),
+                              const SnackBar(
+                                  content: Text('เกิดข้อผิดพลาดในการลบกลุ่ม')),
                             );
                           }
                         },
-                        child: InkWell(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => GroupDetailScreen(
-                                  groupId: groups[index].id,
-                                  username: widget.username,
-                                  userEmail: widget.userEmail,
-                                ),
-                              ),
-                            );
-                          },
-                          child: _buildGroupCard(groups[index]),
-                        ),
+                        child: _buildGroupCard(groups[index]),
                       );
                     },
                   );
