@@ -208,12 +208,38 @@ class _GroupMembersTabState extends State<GroupMembersTab> {
         future: FirebaseFirestore.instance
             .collection('users')
             .where('email', isEqualTo: member['email'])
+            .limit(1)
             .get(),
-        builder: (context, snapshot) {
+        builder: (BuildContext context, AsyncSnapshot<QuerySnapshot> snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return ClipOval(
+              child: Container(
+                color: Colors.grey[200],
+                child: const CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0C5217)),
+                ),
+              ),
+            );
+          }
+
+          if (snapshot.hasError) {
+            return ClipOval(
+              child: Container(
+                color: Colors.grey[200],
+                child: Icon(
+                  Icons.error,
+                  color: Colors.grey[600],
+                  size: 24,
+                ),
+              ),
+            );
+          }
+
           if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
             final userData =
                 snapshot.data!.docs.first.data() as Map<String, dynamic>;
-            final accountImageUrl = userData['profileImageUrl'];
+            final accountImageUrl = userData['profileImageUrl'] as String?;
 
             return ClipOval(
               child: Container(
@@ -245,6 +271,7 @@ class _GroupMembersTabState extends State<GroupMembersTab> {
               ),
             );
           }
+
           return ClipOval(
             child: Container(
               color: Colors.grey[200],
