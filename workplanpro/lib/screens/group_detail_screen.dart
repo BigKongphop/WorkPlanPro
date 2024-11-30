@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import './group_settings_screen.dart';
+import './group_calendar_page.dart';
 import '../widgets/group_member_tab.dart';
-import 'group_settings_screen.dart';
 
 class GroupDetailScreen extends StatefulWidget {
   final String groupId;
@@ -226,19 +227,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     );
   }
 
-  Widget _buildCalendarView() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.calendar_today, size: 48, color: Colors.grey),
-          SizedBox(height: 16),
-          Text('Calendar feature coming soon'),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -347,7 +335,10 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
             child: _selectedTabIndex == 0
                 ? _buildChatView()
                 : _selectedTabIndex == 1
-                    ? _buildCalendarView()
+                    ? GroupCalendarPage(
+                        groupId: widget.groupId,
+                        currentUserEmail: widget.userEmail,
+                      )
                     : GroupMembersTab(
                         groupId: widget.groupId,
                         currentUsername: widget.username,

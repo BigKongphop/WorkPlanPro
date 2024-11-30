@@ -208,19 +208,58 @@ class _AddActivityScreenState extends State<AddActivityScreen> {
 
   Future<void> _selectTime(BuildContext context,
       {required bool isStartTime}) async {
-    final TimeOfDay? picked = await showTimePicker(
+    final TimeOfDay initialTime = isStartTime ? _startTime : _endTime;
+
+    TimeOfDay? picked = await showTimePicker(
       context: context,
-      initialTime: isStartTime ? _startTime : _endTime,
+      initialTime: initialTime,
     );
+
     if (picked != null) {
-      setState(() {
-        if (isStartTime) {
+      if (isStartTime) {
+        setState(() {
           _startTime = picked;
+          _endTime = TimeOfDay(
+            hour: picked.hour + 1 >= 24 ? 23 : picked.hour + 1,
+            minute: picked.minute,
+          );
+        });
+      } else {
+        bool isValid = false;
+
+        if (_startTime.period != picked.period) {
+          isValid = picked.period == DayPeriod.pm &&
+              _startTime.period == DayPeriod.am;
         } else {
-          _endTime = picked;
+          isValid = _timeToDouble(picked) > _timeToDouble(_startTime);
         }
-      });
+
+        if (!isValid) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('End time must be after start time'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+
+        setState(() {
+          _endTime = picked;
+        });
+      }
     }
+  }
+
+  double _timeToDouble(TimeOfDay time) {
+    double hour = time.hour.toDouble();
+    if (time.period == DayPeriod.pm && time.hour != 12) {
+      hour += 12;
+    }
+    if (time.period == DayPeriod.am && time.hour == 12) {
+      hour = 0;
+    }
+    return hour + time.minute / 60.0;
   }
 
   void _showDiscardChangesDialog() {
