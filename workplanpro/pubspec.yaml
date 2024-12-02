@@ -71,3 +71,19 @@ flutter:
     - assets/group_images/default1.png 
     - assets/group_images/default2.png
     - assets/group_images/default3.png
+
+    - assets/profile_images/default1.jpg
+    - assets/profile_images/default2.jpg
+    - assets/profile_images/default3.jpg
+    - assets/profile_images/default4.jpg
+    - assets/profile_images/default5.jpg
+    - assets/profile_images/default6.jpg
+    - assets/profile_images/default7.jpg
+    - assets/profile_images/default8.jpg
+    - assets/profile_images/default9.jpg
+    - assets/profile_images/default10.jpg
+    - assets/profile_images/default11.jpg
+    - assets/profile_images/default12.jpg
+    - assets/profile_images/default13.jpg
+    - assets/profile_images/default14.jpg
+    - assets/profile_images/default15.jpg

@@ -13,9 +13,9 @@ import 'package:email_validator/email_validator.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:workplanpro/screens/login_page.dart';
 import 'package:http/http.dart' as http;
+import 'choose_profileimage_screen.dart';
 
 class FirebaseService {
   static Future<Map<String, dynamic>> fetchUserData() async {
@@ -287,10 +287,9 @@ class ProfileInfoCard extends StatelessWidget {
 class _EditProfilePageState extends State<EditProfilePage>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late Map<String, dynamic> _userData = {};
-  StreamSubscription? _phoneVerificationSubscription;
   bool _isInitialized = false;
   late TextEditingController _usernameController;
-  late TextEditingController _emailController; // Ensure this is declared
+  late TextEditingController _emailController;
   late TextEditingController _phoneController;
   late TextEditingController _addressController;
 
@@ -299,12 +298,13 @@ class _EditProfilePageState extends State<EditProfilePage>
   late Animation<Offset> _slideAnimation;
   final ScrollController _scrollController = ScrollController();
   final _formKey = GlobalKey<FormState>();
-  final UserProfileNotifier _userProfileNotifier = UserProfileNotifier();
+
   bool _isDisposed = false;
   bool _isPhoneVerified = false;
   bool _hasChanges = false;
   String? _profileImageUrl;
   String? _verificationId;
+  String? _selectedProfileImage;
   String _phoneVerificationMessage = '';
   // เพิ่มตัวแปรสำหรับการจัดการสถานะ
   bool _hasInternetConnection = true;
@@ -341,12 +341,24 @@ class _EditProfilePageState extends State<EditProfilePage>
     _fetchInitialUserData(); // เรียกใช้เพื่อโหลดข้อมูลผู้ใช้ก่อน
     _listenForEmailChange();
     _setupConnectivityListener(); // เรียกใช้งานเพื่อโหลดข้อมูลการเชื่อมต่อ
+    _selectedProfileImage = widget.userData['profileImageUrl'];
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadProfileImageFromFirestore(); // โหลดรูปโปรไฟล์จาก Firestore
       _setupChangeListeners(); // ตั้งค่าการฟังการเปลี่ยนแปลง
       _initializePage(); // เรียกใช้เพื่อเริ่มต้นหน้า
     });
+  }
+
+  void _initializeControllers() {
+    _usernameController =
+        TextEditingController(text: widget.userData['username'] ?? '');
+    _emailController =
+        TextEditingController(text: widget.userData['email'] ?? '');
+    _phoneController =
+        TextEditingController(text: widget.userData['phone'] ?? '');
+    _addressController =
+        TextEditingController(text: widget.userData['address'] ?? '');
   }
 
   @override
@@ -739,17 +751,6 @@ class _EditProfilePageState extends State<EditProfilePage>
     }
   }
 
-  void _initializeControllers() {
-    _usernameController =
-        TextEditingController(text: widget.userData['username'] ?? '');
-    _phoneController =
-        TextEditingController(text: widget.userData['phone'] ?? '');
-    _addressController =
-        TextEditingController(text: widget.userData['address'] ?? '');
-    _emailController = TextEditingController(
-        text: widget.userData['email'] ?? ''); // Initialize email controller
-  }
-
   void _setupAnimations() {
     _animationController = AnimationController(
       vsync: this,
@@ -770,18 +771,6 @@ class _EditProfilePageState extends State<EditProfilePage>
 
     _animationController.forward();
   }
-
-  /**@override
-  void dispose() {
-    _phoneVerificationSubscription?.cancel();
-    _animationController.dispose(); // Dispose the animation controller
-    _usernameController.dispose();
-    _emailController.dispose(); // Dispose email controller
-    _phoneController.dispose();
-    _addressController.dispose();
-    _isDisposed = true;
-    super.dispose();
-  }*/
 
   void _listenForEmailChange() {
     FirebaseAuth.instance.authStateChanges().listen((User? user) {
@@ -927,34 +916,27 @@ class _EditProfilePageState extends State<EditProfilePage>
   }
 
   Future<void> _selectProfileImage() async {
-    // เปิดเมนูให้เลือกแหล่งที่มาของรูปภาพทันที
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Profile Picture'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Take a Photo'),
-              onTap: () {
-                Navigator.of(context).pop(); // ปิด Dialog
-                _pickImage(ImageSource.camera); // เรียกฟังก์ชันเลือกภาพจากกล้อง
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Choose from Gallery'),
-              onTap: () {
-                Navigator.of(context).pop(); // ปิด Dialog
-                _pickImage(ImageSource.gallery); // เรียกฟังก์ชันเลือกภาพจากคลัง
-              },
-            ),
-          ],
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChooseProfileImageScreen(
+          currentImage: _selectedProfileImage,
+          onImageSelected: (imagePath) {
+            setState(() {
+              _selectedProfileImage = imagePath;
+              _hasChanges = true;
+            });
+          },
         ),
       ),
     );
+
+    if (result != null) {
+      setState(() {
+        _selectedProfileImage = result;
+        _hasChanges = true;
+      });
+    }
   }
 
   final ImagePicker _picker = ImagePicker();
@@ -986,51 +968,6 @@ class _EditProfilePageState extends State<EditProfilePage>
       );
     }
   }
-
-  /*Future<void> _uploadProfileImage(File imageFile) async {
-    try {
-      User? currentUser = FirebaseAuth.instance.currentUser;
-
-      if (currentUser == null) {
-        throw Exception('User  not found');
-      }
-
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('profile_images')
-          .child('${currentUser.uid}.jpg');
-
-      await storageRef.putFile(imageFile);
-
-      final imageUrl = await storageRef.getDownloadURL();
-
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .update({
-        'profileImageUrl': imageUrl,
-      });
-
-      setState(() {
-        _profileImageUrl = imageUrl;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile image uploaded successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      print('Error uploading image: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }*/
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
@@ -1092,86 +1029,84 @@ class _EditProfilePageState extends State<EditProfilePage>
 
   Widget _buildProfileImageSection() {
     return GestureDetector(
-      onTap: () => _selectProfileImage(),
-      child: Hero(
-        tag: 'profile_image',
-        child: CircleAvatar(
-          radius: 80,
-          backgroundColor: Colors.green.shade100,
-          child: _buildProfileImageContent(),
-        ),
+      onTap: _selectProfileImage,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 200,
+            height: 200,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFF0C5217),
+                width: 2,
+              ),
+            ),
+            child: ClipOval(
+              child: _selectedProfileImage != null
+                  ? Image.asset(
+                      _selectedProfileImage!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        print('Error loading profile image: $error');
+                        return _buildDefaultAvatar();
+                      },
+                    )
+                  : _buildDefaultAvatar(),
+            ),
+          ),
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0C5217),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.camera_alt,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildProfileImageContent() {
-    print('Profile Image Path: $_profileImagePath');
-    print('Profile Image URL: $_profileImageUrl');
-
-    // กรณีที่ไม่มีรูปภาพ
-    if (_profileImagePath == null && _profileImageUrl == null) {
-      return CircleAvatar(
-        radius: 75,
-        backgroundColor: Colors.green.shade100,
-        child: Icon(Icons.person, size: 80, color: Colors.green.shade800),
-      );
-    }
-
-    // กรณีมี path ของไฟล์ (local file)
-    if (_profileImagePath != null) {
-      final File imageFile = File(_profileImagePath!);
-      if (imageFile.existsSync()) {
-        return CircleAvatar(
-          radius: 75,
-          backgroundImage: FileImage(imageFile),
-          child: _buildCameraButton(),
-        );
-      }
-    }
-
-    // กรณีมี URL จาก Firebase หรือ Network
-    if (_profileImageUrl != null) {
-      // ตรวจสอบว่าเป็น local path หรือ network URL
-      if (_profileImageUrl!.startsWith('/') ||
-          _profileImageUrl!.startsWith('file://')) {
-        final File imageFile = File(_profileImageUrl!);
-        if (imageFile.existsSync()) {
-          return CircleAvatar(
-            radius: 75,
-            backgroundImage: FileImage(imageFile),
-            child: _buildCameraButton(),
-          );
-        }
-      } else {
-        // กรณีเป็น Network URL
-        return CachedNetworkImage(
-          imageUrl: _profileImageUrl!,
-          imageBuilder: (context, imageProvider) => CircleAvatar(
-            radius: 75,
-            backgroundImage: imageProvider,
-            child: _buildCameraButton(),
-          ),
-          placeholder: (context, url) => CircleAvatar(
-            radius: 75,
-            backgroundColor: Colors.green.shade100,
-            child: CircularProgressIndicator(
-              color: Colors.green.shade800,
-            ),
-          ),
-          errorWidget: (context, url, error) => CircleAvatar(
-            radius: 75,
-            backgroundColor: Colors.green.shade100,
-            child: Icon(Icons.person, size: 80, color: Colors.green.shade800),
-          ),
-        );
-      }
-    }
-
-    // Fallback to default avatar
-    return CircleAvatar(
-      radius: 75,
-      backgroundColor: Colors.green.shade100,
-      child: Icon(Icons.person, size: 80, color: Colors.green.shade800),
+    return Container(
+      width: 200, // เท่ากับในหน้า account
+      height: 200, // เท่ากับในหน้า account
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Color(0xFF0C5217),
+          width: 3,
+        ),
+      ),
+      child: ClipOval(
+        child: widget.userData['profileImageUrl'] != null
+            ? Image.asset(
+                widget.userData['profileImageUrl']!,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  print('Error loading profile image: $error');
+                  return _buildDefaultAvatar();
+                },
+              )
+            : _buildDefaultAvatar(),
+      ),
     );
   }
 
@@ -1209,29 +1144,40 @@ class _EditProfilePageState extends State<EditProfilePage>
   Widget _buildProfileImage() {
     return GestureDetector(
       onTap: _selectProfileImage,
-      child: Hero(
-        tag: 'profile_image',
-        child: CachedNetworkImage(
-          imageUrl: _profileImageUrl ?? 'default_image_url',
-          placeholder: (context, url) => Container(
-            color: Colors.grey[200], // สีพื้นหลังเมื่อกำลังโหลด
-            child: Center(child: CircularProgressIndicator()),
-          ),
-          errorWidget: (context, url, error) => Container(
-            color: Colors.red[100], // สีพื้นหลังเมื่อเกิดข้อผิดพลาด
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error, color: Colors.red), // แสดงไอคอนข้อผิดพลาด
-                SizedBox(height: 8),
-                Text(
-                  'ไม่สามารถโหลดรูปภาพ',
-                  style: TextStyle(color: Colors.red),
-                ),
-              ],
-            ),
+      child: Container(
+        width: 120,
+        height: 120,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.green[100],
+          border: Border.all(
+            color: Color(0xFF0C5217),
+            width: 2,
           ),
         ),
+        child: ClipOval(
+          child: _selectedProfileImage != null
+              ? Image.asset(
+                  _selectedProfileImage!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    print('Error loading profile image: $error');
+                    return _buildDefaultAvatar();
+                  },
+                )
+              : _buildDefaultAvatar(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDefaultAvatar() {
+    return Container(
+      color: Colors.green.shade100,
+      child: Icon(
+        Icons.person,
+        size: 60,
+        color: const Color(0xFF0C5217),
       ),
     );
   }
@@ -2029,72 +1975,37 @@ class _EditProfilePageState extends State<EditProfilePage>
   }
 
   Future<void> _saveProfile() async {
-    if (!mounted || !_isInitialized) return;
-
-    // ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต
-    bool hasInternet = await _checkInternetConnectivity();
-    if (!hasInternet) {
-      _showQuickFeedback(
-        message: 'กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต',
-        isError: true,
-      );
-      return;
-    }
-
-    // ตรวจสอบว่ามีการเปลี่ยนแปลงจริงๆ
-    if (!_checkForChanges()) {
-      _showQuickFeedback(
-        message: 'ไม่มีข้อมูลที่เปลี่ยนแปลง',
-        isError: false,
-      );
-      return;
-    }
-
-    _showProgressIndicator();
-
     try {
-      // ตรวจสอบความถูกต้องของข้อมูล
-      if (!_validateProfileData()) {
-        _hideProgressIndicator();
-        return;
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      Map<String, dynamic> updateData = {
+        'username': _usernameController.text,
+        'phone': _phoneController.text,
+        'address': _addressController.text,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      };
+
+      // เพิ่มการอัปเดต profileImageUrl เมื่อมีการเลือกรูปใหม่
+      if (_selectedProfileImage != null &&
+          _selectedProfileImage != widget.userData['profileImageUrl']) {
+        updateData['profileImageUrl'] = _selectedProfileImage;
       }
 
-      // เตรียมข้อมูลที่จะอัปเดต
-      Map<String, dynamic> updateData = _prepareUpdateData();
-
-      // เพิ่ม lastUpdated เข้าไปใน updateData
-      updateData['lastUpdated'] = FieldValue.serverTimestamp();
-
-      // ตรวจสอบว่ามีข้อมูลที่ต้องอัปเดต
-      if (updateData.isEmpty) {
-        _hideProgressIndicator();
-        _showQuickFeedback(
-          message: 'ไม่มีข้อมูลที่ต้องอัปเดต',
-          isError: false,
-        );
-        return;
-      }
-
-      // ตรวจสอบว่ามีรูปภาพโปรไฟล์ใหม่หรือไม่
-      if (_profileImagePath != null) {
-        // บันทึกที่อยู่ของรูปภาพในข้อมูลที่จะอัปเดต
-        updateData['profileImageUrl'] = _profileImagePath;
-      }
-
-      // อัปเดตข้อมูลใน Firestore
       await FirebaseFirestore.instance
           .collection('users')
-          .doc(FirebaseAuth.instance.currentUser?.uid)
+          .doc(user.uid)
           .update(updateData);
 
-      // อัปเดตข้อมูลใน local state
-      _updateLocalState(updateData);
+      setState(() => _hasChanges = false);
 
-      _hideProgressIndicator();
-      _showSuccessFeedback();
-    } catch (error) {
-      _hideProgressIndicator();
-      _handleError(error);
+      // ส่งค่ากลับเพื่อบอกว่ามีการอัปเดต
+      Navigator.pop(context, true);
+    } catch (e) {
+      print('Error saving profile: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('เกิดข้อผิดพลาดในการบันทึกข้อมูล')),
+      );
     }
   }
 

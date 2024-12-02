@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 class GroupMembersTab extends StatefulWidget {
   final String groupId;
@@ -215,23 +214,7 @@ class _GroupMembersTabState extends State<GroupMembersTab> {
             return ClipOval(
               child: Container(
                 color: Colors.grey[200],
-                child: const CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0C5217)),
-                ),
-              ),
-            );
-          }
-
-          if (snapshot.hasError) {
-            return ClipOval(
-              child: Container(
-                color: Colors.grey[200],
-                child: Icon(
-                  Icons.error,
-                  color: Colors.grey[600],
-                  size: 24,
-                ),
+                child: Icon(Icons.person, color: Colors.grey[400], size: 24),
               ),
             );
           }
@@ -239,7 +222,7 @@ class _GroupMembersTabState extends State<GroupMembersTab> {
           if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
             final userData =
                 snapshot.data!.docs.first.data() as Map<String, dynamic>;
-            final accountImageUrl = userData['profileImageUrl'] as String?;
+            final profileImageUrl = userData['profileImageUrl'] as String?;
 
             return ClipOval(
               child: Container(
@@ -247,37 +230,35 @@ class _GroupMembersTabState extends State<GroupMembersTab> {
                   color: Colors.grey[200],
                   shape: BoxShape.circle,
                 ),
-                child: accountImageUrl != null && accountImageUrl.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: accountImageUrl,
+                child: profileImageUrl != null && profileImageUrl.isNotEmpty
+                    ? Image.asset(
+                        profileImageUrl,
                         fit: BoxFit.cover,
-                        placeholder: (context, url) =>
-                            const CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Color(0xFF0C5217)),
-                        ),
-                        errorWidget: (context, url, error) => Icon(
-                          Icons.person,
-                          color: Colors.grey[600],
-                          size: 24,
-                        ),
+                        errorBuilder: (context, error, stackTrace) {
+                          print('Error loading profile image: $error');
+                          return Icon(
+                            Icons.person,
+                            color: Colors.grey[400],
+                            size: 24,
+                          );
+                        },
                       )
                     : Icon(
                         Icons.person,
-                        color: Colors.grey[600],
+                        color: Colors.grey[400],
                         size: 24,
                       ),
               ),
             );
           }
 
+          // Default avatar if no user data found
           return ClipOval(
             child: Container(
               color: Colors.grey[200],
               child: Icon(
                 Icons.person,
-                color: Colors.grey[600],
+                color: Colors.grey[400],
                 size: 24,
               ),
             ),
