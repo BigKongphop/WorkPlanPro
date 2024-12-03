@@ -985,20 +985,6 @@ class _EditProfilePageState extends State<EditProfilePage>
           fontSize: 24,
         ),
       ),
-      actions: [
-        if (_hasChanges) // ปุ่มบันทึกจะแสดงเมื่อมีการเปลี่ยนแปลง
-          TextButton(
-            onPressed: _saveProfile,
-            child: Text(
-              'บันทึก',
-              style: TextStyle(
-                color: Colors.green[700],
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-          ),
-      ],
     );
   }
 
@@ -1280,22 +1266,87 @@ class _EditProfilePageState extends State<EditProfilePage>
   Widget _buildContactInfo() {
     return Column(
       children: [
-        _buildContactTile(
-          icon: Icons.email_outlined,
-          title: 'Mail',
-          value: FirebaseAuth.instance.currentUser?.email ?? 'ไม่มีอีเมล',
-          verificationStatus: _emailVerificationStatus,
-          isVerified: _isEmailVerified,
-          onTap: () => _showEmailUpdateDialog(),
+        // Email Field - Disabled
+        Container(
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey[300]!),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.email_outlined, color: Colors.grey[600]),
+              SizedBox(width: 15),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Mail',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      FirebaseAuth.instance.currentUser?.email ?? 'No email',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey[
+                            600], // สีตัวอักษรเป็นสีเทาเพื่อแสดงว่าแก้ไขไม่ได้
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
         SizedBox(height: 15),
-        _buildContactTile(
-          icon: Icons.phone_outlined,
-          title: 'Phone Nuber',
-          value: _phoneController.text,
-          verificationStatus: 'No Confirmation Needed',
-          isVerified: true, // แสดงว่ามีเบอร์โทรศัพท์
+        // Phone Field - Still editable
+        InkWell(
           onTap: () => _showPhoneUpdateDialog(),
+          child: Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.black!),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.phone_outlined, color: Colors.green[800]),
+                SizedBox(width: 15),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Phone Number',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 12,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        _phoneController.text,
+                        style: TextStyle(fontSize: 16),
+                      ),
+                      if (_phoneVerificationMessage.isNotEmpty)
+                        Text(
+                          _phoneVerificationMessage,
+                          style: TextStyle(
+                            color: Colors.green,
+                            fontSize: 12,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );
@@ -1385,26 +1436,28 @@ class _EditProfilePageState extends State<EditProfilePage>
       final result = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text('ข้อมูลยังไม่ได้บันทึก'),
+          title: Text('Unsaved Changes'),
           content:
-              Text('คุณมีการแก้ไขข้อมูลที่ยังไม่ได้บันทึก ต้องการออกหรือไม่?'),
+              Text('You have unsaved changes. Do you want to discard them?'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(false), // ยกเลิก
-              child: Text('ยกเลิก', style: TextStyle(color: Colors.grey)),
+              onPressed: () => Navigator.of(context).pop(false), // Cancel
+              child: Text('Cancel', style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
               onPressed: () {
-                // ถ้าเลือกออก ให้กลับไปที่ AccountPage
+                // If choosing to exit, return to AccountPage
                 Navigator.of(context).pop(true);
               },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-              child: Text('ออก'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white, // Sets text color to white
+              ),
+              child: Text('Discard'),
             ),
           ],
         ),
       );
-
       // ส่งค่ากลับเพื่อควบคุมการออกจากหน้า
       return result ?? false;
     }
@@ -1492,27 +1545,20 @@ class _EditProfilePageState extends State<EditProfilePage>
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
-      onWillPop: _onWillPop, // ใช้เมธอดนี้เพื่อจัดการการออกจากหน้า
+      onWillPop: _onWillPop,
       child: Scaffold(
+        backgroundColor: Colors.white,
         appBar: AppBar(
-          title: Text('Edit Profile'),
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back),
-            onPressed: () => _handleBackNavigation(), // ใช้เมธอดใหม่นี้
+          backgroundColor: const Color(0xFF0C5217),
+          elevation: 0,
+          title: Text(
+            'Edit Profile',
+            style: TextStyle(color: Colors.white),
           ),
-          actions: [
-            if (_hasChanges)
-              TextButton(
-                onPressed: _saveProfile,
-                child: Text(
-                  'บันทึก',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-          ],
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => _handleBackNavigation(),
+          ),
         ),
         body: _isInitialized
             ? Stack(
@@ -1537,7 +1583,7 @@ class _EditProfilePageState extends State<EditProfilePage>
               ),
       ),
     );
-  } // เพิ่มเมธอดใหม่นี้
+  }
 
   void _handleBackNavigation() {
     _onWillPop().then((canPop) {
@@ -2767,11 +2813,11 @@ class _EditProfilePageState extends State<EditProfilePage>
     final cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d]'), '');
 
     if (cleanNumber.isEmpty) {
-      return 'กรุณากรอกเบอร์โทรศัพท์';
+      return 'Please enter phone number';
     }
 
     if (cleanNumber.length != 10) {
-      return 'เบอร์โทรศัพท์ต้องมี 10 หลัก';
+      return 'Please enter 10 digits';
     }
 
     // ตรวจสอบรหัสนำหน้าที่ถูกต้อง

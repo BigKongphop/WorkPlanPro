@@ -49,7 +49,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
           .collection('groups')
           .doc(widget.groupId)
           .get();
-      
+
       if (mounted && doc.exists) {
         final data = doc.data()!;
         setState(() {
@@ -116,7 +116,8 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     final storageRef = FirebaseStorage.instance
         .ref()
         .child('group_images')
-        .child('${widget.groupId}_${DateTime.now().millisecondsSinceEpoch}.jpg');
+        .child(
+            '${widget.groupId}_${DateTime.now().millisecondsSinceEpoch}.jpg');
 
     final uploadTask = storageRef.putFile(
       imageFile,
@@ -132,9 +133,9 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
         .collection('groups')
         .doc(widget.groupId)
         .update({
-          'imageUrl': imageUrl,
-          'lastUpdated': FieldValue.serverTimestamp(),
-        });
+      'imageUrl': imageUrl,
+      'lastUpdated': FieldValue.serverTimestamp(),
+    });
   }
 
   Future<void> _editGroupInfo() async {
@@ -150,10 +151,10 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
           .collection('groups')
           .doc(widget.groupId)
           .update({
-            'name': _nameController.text.trim(),
-            'description': _descriptionController.text.trim(),
-            'lastUpdated': FieldValue.serverTimestamp(),
-          });
+        'name': _nameController.text.trim(),
+        'description': _descriptionController.text.trim(),
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
 
       setState(() {
         currentGroupName = _nameController.text.trim();
@@ -177,7 +178,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       setState(() => isLoading = true);
 
       final batch = FirebaseFirestore.instance.batch();
-      
+
       // Remove member from members collection
       final memberQuery = await FirebaseFirestore.instance
           .collection('groups')
@@ -191,7 +192,8 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       }
 
       // Update group document
-      final groupRef = FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
+      final groupRef =
+          FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
       batch.update(groupRef, {
         'memberCount': FieldValue.increment(-1),
         'memberEmails': FieldValue.arrayRemove([widget.currentUserEmail])
@@ -223,18 +225,20 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
           .get();
 
       final batch = FirebaseFirestore.instance.batch();
-      
+
       for (var doc in membersSnapshot.docs) {
         batch.delete(doc.reference);
       }
 
       // Delete group document
-      batch.delete(FirebaseFirestore.instance.collection('groups').doc(widget.groupId));
+      batch.delete(
+          FirebaseFirestore.instance.collection('groups').doc(widget.groupId));
 
       await batch.commit();
 
       // Delete group image if exists
-      if (currentGroupImage != null && !currentGroupImage!.startsWith('assets/')) {
+      if (currentGroupImage != null &&
+          !currentGroupImage!.startsWith('assets/')) {
         try {
           await FirebaseStorage.instance
               .refFromURL(currentGroupImage!)
@@ -271,8 +275,13 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Group Settings'),
+        title: Text('Group Settings', style: TextStyle(color: Colors.white)),
         backgroundColor: Color(0xFF0C5217),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back,
+              color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
       body: Stack(
         children: [
@@ -360,7 +369,8 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                     backgroundColor: Color(0xFF0C5217),
                     minimumSize: Size(double.infinity, 50),
                   ),
-                  child: Text('Save Changes'),
+                  child: Text('Save Changes',
+                      style: TextStyle(color: Colors.white)),
                 ),
                 SizedBox(height: 32),
 

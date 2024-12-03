@@ -13,14 +13,13 @@ class ChooseProfileImageScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<ChooseProfileImageScreen> createState() => _ChooseProfileImageScreenState();
+  State<ChooseProfileImageScreen> createState() =>
+      _ChooseProfileImageScreenState();
 }
 
 class _ChooseProfileImageScreenState extends State<ChooseProfileImageScreen> {
   final List<String> defaultImages = List.generate(
-    15, 
-    (index) => 'assets/profile_images/default${index + 1}.jpg'
-  );
+      15, (index) => 'assets/profile_images/default${index + 1}.jpg');
 
   Future<void> _saveProfileImage(String imagePath) async {
     try {
@@ -44,13 +43,17 @@ class _ChooseProfileImageScreenState extends State<ChooseProfileImageScreen> {
     }
   }
 
-  @override 
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF0C5217),
-        title: const Text('Choose Profile Picture', 
-          style: TextStyle(color: Colors.white)
+        title: const Text('Choose Profile Picture',
+            style: TextStyle(color: Colors.white)),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back,
+              color: Colors.white), // Changed to white
+          onPressed: () => Navigator.of(context).pop(),
         ),
       ),
       body: Column(
@@ -97,7 +100,8 @@ class _ChooseProfileImageScreenState extends State<ChooseProfileImageScreen> {
 
                       if (mounted) {
                         Navigator.pop(context); // Remove loading
-                        Navigator.pop(context, imagePath); // Return to previous screen
+                        Navigator.pop(
+                            context, imagePath); // Return to previous screen
                       }
                     } catch (e) {
                       if (mounted) {
