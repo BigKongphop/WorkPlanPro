@@ -25,7 +25,7 @@ class ActivityModel {
   // ฟังก์ชันสำหรับแปลง Activity เป็น ActivityModel
   factory ActivityModel.fromActivity(Activity activity) {
     return ActivityModel(
-      id: activity.id ?? '',
+      id: activity.id ?? '', // ใช้ ID ที่เป็น null หรือให้เป็น ''
       title: activity.title,
       description: activity.description,
       date: activity.date,
@@ -770,14 +770,11 @@ class _AddActivityScreenState extends State<AddActivityScreen>
       final savedActivity = await _performActivityOperation(
           activityService, activity, widget.activityToEdit != null);
 
-      // แปลง Activity เป็น ActivityModel
-      final activityModel = ActivityModel.fromActivity(savedActivity);
+      // เรียก callback หากมี
+      widget.onActivitySaved?.call(savedActivity);
 
-      // เรียก callback ด้วย ActivityModel
-      widget.onActivitySaved?.call(activityModel as Activity);
-
-      _handleSuccessfulSave(widget.activityToEdit == null ? 'create' : 'update',
-          activityModel as Activity);
+      _handleSuccessfulSave(
+          widget.activityToEdit == null ? 'create' : 'update', savedActivity);
     } catch (e) {
       _showErrorSnackBar('Error: ${e.toString()}');
     }
