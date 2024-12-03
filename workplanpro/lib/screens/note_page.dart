@@ -1,6 +1,6 @@
-//note page
 import 'package:flutter/material.dart';
 import 'package:motion_tab_bar_v2/motion-tab-bar.dart';
+import 'package:intl/intl.dart';
 import 'create_note_screen.dart';
 import '../models/note.dart';
 import 'home_page.dart';
@@ -11,13 +11,9 @@ import '../services/note_database.dart';
 
 class NotePage extends StatefulWidget {
   final String username;
-  final String userEmail; // Add this line
+  final String userEmail;
 
-  const NotePage(
-      {Key? key,
-      required this.username,
-      required this.userEmail // Add this parameter
-      })
+  const NotePage({Key? key, required this.username, required this.userEmail})
       : super(key: key);
 
   @override
@@ -29,6 +25,10 @@ class _NotePageState extends State<NotePage> {
   final NoteDatabase _noteDatabase = NoteDatabase();
   List<Note> notes = [];
   bool _isLoading = true;
+  String _searchQuery = '';
+  String _dateSortBy = 'newest';
+  String _prioritySortBy = 'none';
+  TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -37,22 +37,120 @@ class _NotePageState extends State<NotePage> {
   }
 
   Future<void> _loadNotes() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
       final loadedNotes = await _noteDatabase.loadNotes();
       setState(() {
         notes = loadedNotes;
+        _applySorting();
         _isLoading = false;
       });
     } catch (e) {
       print('Error loading notes: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
+  }
+
+  void _applySorting() {
+    notes.sort((a, b) {
+      if (_prioritySortBy != 'none') {
+        int ratingCompare = _prioritySortBy == 'most_important'
+            ? b.rating.compareTo(a.rating)
+            : a.rating.compareTo(b.rating);
+        if (ratingCompare != 0) return ratingCompare;
+      }
+
+      DateTime dateA = DateFormat('dd MMM. yyyy').parse(a.date);
+      DateTime dateB = DateFormat('dd MMM. yyyy').parse(b.date);
+      return _dateSortBy == 'newest'
+          ? dateB.compareTo(dateA)
+          : dateA.compareTo(dateB);
+    });
+  }
+
+  List<Note> _getFilteredNotes() {
+    return notes
+        .where((note) =>
+            note.title.toLowerCase().contains(_searchQuery.toLowerCase()))
+        .toList();
+  }
+
+  void _showFilterDialog() {
+    String tempDateSort = _dateSortBy;
+    String tempPrioritySort = _prioritySortBy;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text('Filter Notes'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Sort By Date:',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  RadioListTile(
+                    title: Text('Newest First'),
+                    value: 'newest',
+                    groupValue: tempDateSort,
+                    onChanged: (value) => setState(() => tempDateSort = value!),
+                  ),
+                  RadioListTile(
+                    title: Text('Oldest First'),
+                    value: 'oldest',
+                    groupValue: tempDateSort,
+                    onChanged: (value) => setState(() => tempDateSort = value!),
+                  ),
+                  SizedBox(height: 16),
+                  Text('Sort By Priority:',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  RadioListTile(
+                    title: Text('Most Important'),
+                    value: 'most_important',
+                    groupValue: tempPrioritySort,
+                    onChanged: (value) =>
+                        setState(() => tempPrioritySort = value!),
+                  ),
+                  RadioListTile(
+                    title: Text('Least Important'),
+                    value: 'least_important',
+                    groupValue: tempPrioritySort,
+                    onChanged: (value) =>
+                        setState(() => tempPrioritySort = value!),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.red[400],
+                  ),
+                  child: Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    this.setState(() {
+                      _dateSortBy = tempDateSort;
+                      _prioritySortBy = tempPrioritySort;
+                      _applySorting();
+                    });
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF40884B),
+                  ),
+                  child: Text('Apply', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -60,76 +158,47 @@ class _NotePageState extends State<NotePage> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Color(0xFF0C5217),
-        title: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10.0),
-          child: Container(
-            height: 40.0,
-            child: Opacity(
-              opacity: 0.3,
-              child: TextField(
-                decoration: InputDecoration(
-                  filled: true,
-                  fillColor: Colors.white,
-                  hintText: 'Search...',
-                  prefixIcon: Icon(Icons.search, color: Color(0xFF0C5217)),
-                  contentPadding: EdgeInsets.symmetric(vertical: 10.0),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30.0),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-            ),
-          ),
+        title: Text(
+          'My Notes',
+          style: TextStyle(color: Colors.white),
         ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.filter_list, color: Colors.white),
+            onPressed: _showFilterDialog,
+          ),
+        ],
       ),
       body: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF0C5217),
-                ),
-                child: Text(
-                  'Important',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF0C5217),
-                ),
-                child: Text(
-                  'Routine',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+              decoration: InputDecoration(
+                hintText: 'Search notes...',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30.0),
                 ),
               ),
-            ],
+            ),
           ),
           Expanded(
             child: _isLoading
                 ? Center(
                     child: CircularProgressIndicator(color: Color(0xFF0C5217)))
                 : ListView.builder(
-                    itemCount: notes.length,
+                    itemCount: _getFilteredNotes().length,
                     itemBuilder: (context, index) {
-                      final note = notes[index];
+                      final note = _getFilteredNotes()[index];
                       return GestureDetector(
-                        onTap: () {
-                          _showNoteDetail(context, note, index);
-                        },
+                        onTap: () => _showNoteDetail(context, note, index),
                         child: Card(
                           margin: EdgeInsets.all(8.0),
                           child: Padding(
@@ -150,6 +219,7 @@ class _NotePageState extends State<NotePage> {
                                       i < note.rating
                                           ? Icons.star
                                           : Icons.star_border,
+                                      size: 20,
                                       color: i < note.rating
                                           ? Color(0xFF0C5217)
                                           : Colors.grey,
@@ -233,7 +303,6 @@ class _NotePageState extends State<NotePage> {
               );
               break;
             case 2:
-              // Already in Notes page
               break;
             case 3:
               Navigator.pushReplacement(
@@ -323,6 +392,7 @@ class _NotePageState extends State<NotePage> {
                           i < note.rating ? Icons.star : Icons.star_border,
                           color:
                               i < note.rating ? Color(0xFF0C5217) : Colors.grey,
+                          size: 24,
                         );
                       }),
                     ),
@@ -407,30 +477,6 @@ class _NotePageState extends State<NotePage> {
           ],
         );
       },
-    );
-  }
-
-  Widget _buildNavBarItem(IconData icon, String label, int index) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(vertical: 5),
-      decoration: BoxDecoration(
-        color: _currentIndex == index ? Color(0xFF0C5217) : Colors.transparent,
-        borderRadius: BorderRadius.circular(0),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon,
-              color: _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
-          Text(
-            label,
-            style: TextStyle(
-                color:
-                    _currentIndex == index ? Colors.white : Color(0xFF0C5217)),
-          )
-        ],
-      ),
     );
   }
 }

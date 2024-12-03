@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/note.dart';
 
 class CreateNoteScreen extends StatefulWidget {
-  final Note? note;  
+  final Note? note;
 
   CreateNoteScreen({this.note});
 
@@ -13,24 +13,70 @@ class CreateNoteScreen extends StatefulWidget {
 
 class _CreateNoteScreenState extends State<CreateNoteScreen> {
   late int _rating;
-
   late TextEditingController titleController;
   late TextEditingController contentController;
+
+  static const Map<int, String> ratingDescriptions = {
+    1: 'Low Priority',
+    2: 'Medium Priority',
+    3: 'High Priority'
+  };
 
   @override
   void initState() {
     super.initState();
-    
-
     _rating = widget.note?.rating ?? 0;
-
     titleController = TextEditingController(text: widget.note?.title ?? '');
     contentController = TextEditingController(text: widget.note?.content ?? '');
   }
 
+  Widget _buildRatingStars() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Importance:',
+          style: TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold),
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: List.generate(3, (index) {
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  _rating = index + 1;
+                });
+              },
+              child: Padding(
+                padding: EdgeInsets.all(8.0),
+                child: Column(
+                  children: [
+                    Icon(
+                      index < _rating ? Icons.star : Icons.star_border,
+                      color: Color(0xFF0C5217),
+                      size: 40,
+                    ),
+                    Text(
+                      ratingDescriptions[index + 1] ?? '',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    String formattedDate = widget.note?.date ?? DateFormat('dd MMM. yyyy').format(DateTime.now());
+    String formattedDate =
+        widget.note?.date ?? DateFormat('dd MMM. yyyy').format(DateTime.now());
 
     return Scaffold(
       appBar: AppBar(
@@ -44,90 +90,64 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              formattedDate,
-              style: TextStyle(
-                fontSize: 24.0,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0C5217),
-              ),
-            ),
-            SizedBox(height: 8.0),
-            TextFormField(
-              controller: titleController,
-              decoration: InputDecoration(
-                labelText: 'Title',
-                labelStyle: TextStyle(color: Color(0xFF0C5217)),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10.0),
-                  borderSide: BorderSide(
-                    color: Color(0xFF0C5217),
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10.0),
-                  borderSide: BorderSide(
-                    color: Color(0xFF0C5217),
-                    width: 2.0,
-                  ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                formattedDate,
+                style: TextStyle(
+                  fontSize: 24.0,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0C5217),
                 ),
               ),
-            ),
-            SizedBox(height: 8.0),
-            TextFormField(
-              controller: contentController,
-              decoration: InputDecoration(
-                labelText: 'Content',
-                labelStyle: TextStyle(color: Color(0xFF0C5217)),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10.0),
-                  borderSide: BorderSide(
-                    color: Color(0xFF0C5217),
+              SizedBox(height: 16.0),
+              TextFormField(
+                controller: titleController,
+                decoration: InputDecoration(
+                  labelText: 'Title',
+                  labelStyle: TextStyle(color: Color(0xFF0C5217)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                    borderSide: BorderSide(color: Color(0xFF0C5217)),
                   ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10.0),
-                  borderSide: BorderSide(
-                    color: Color(0xFF0C5217),
-                    width: 2.0,
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                    borderSide: BorderSide(
+                      color: Color(0xFF0C5217),
+                      width: 2.0,
+                    ),
                   ),
                 ),
               ),
-              maxLines: 5,
-            ),
-            SizedBox(height: 16.0),
-            Text(
-              'Importance:',
-              style: TextStyle(
-                fontSize: 18.0,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Row(
-              children: List.generate(3, (index) {
-                return IconButton(
-                  onPressed: () {
-                    setState(() {
-                      _rating = index + 1;
-                    });
-                  },
-                  icon: Icon(
-                    index < _rating ? Icons.star : Icons.star_border,
-                    color: Color(0xFF0C5217),
+              SizedBox(height: 16.0),
+              TextFormField(
+                controller: contentController,
+                decoration: InputDecoration(
+                  labelText: 'Content',
+                  labelStyle: TextStyle(color: Color(0xFF0C5217)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                    borderSide: BorderSide(color: Color(0xFF0C5217)),
                   ),
-                );
-              }),
-            ),
-            Spacer(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                ElevatedButton(
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                    borderSide: BorderSide(
+                      color: Color(0xFF0C5217),
+                      width: 2.0,
+                    ),
+                  ),
+                ),
+                maxLines: 8,
+              ),
+              SizedBox(height: 24.0),
+              _buildRatingStars(),
+              SizedBox(height: 24.0),
+              Center(
+                child: ElevatedButton(
                   onPressed: () {
                     showDialog(
                       context: context,
@@ -136,9 +156,7 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
                         content: Text('Do you want to save this note?'),
                         actions: [
                           TextButton(
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                            },
+                            onPressed: () => Navigator.of(context).pop(),
                             child: Text('Cancel'),
                           ),
                           TextButton(
@@ -167,20 +185,30 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF40884B),
+                    backgroundColor: Color(0xFF0C5217),
                     padding:
-                        EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+                        EdgeInsets.symmetric(horizontal: 48.0, vertical: 16.0),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30.0),
+                    ),
                   ),
                   child: Text(
-                    'Save',
-                    style: TextStyle(color: Colors.white, fontSize: 16.0),
+                    'Save Note',
+                    style: TextStyle(color: Colors.white, fontSize: 18.0),
                   ),
                 ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    titleController.dispose();
+    contentController.dispose();
+    super.dispose();
   }
 }
