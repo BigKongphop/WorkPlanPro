@@ -1,6 +1,6 @@
 name: workplanpro
 description: "A new Flutter project."
-publish_to: 'none'
+publish_to: "none"
 version: 1.0.0+1
 
 environment:
@@ -17,7 +17,7 @@ dependencies:
 
   shared_preferences: ^2.3.3
   path_provider: ^2.1.5
-  
+
   file_picker: ^5.0.0
   image_picker: ^1.1.2
   path: ^1.8.0
@@ -25,7 +25,7 @@ dependencies:
 
   cupertino_icons: ^1.0.8
   permission_handler: ^10.0.0
-  
+
   form_field_validator: ^1.1.0
   logger: ^2.4.0
   connectivity_plus: ^6.1.0
@@ -62,11 +62,20 @@ dependencies:
   flutter_animate: ^4.5.2
   font_awesome_flutter: ^10.8.0
   share_plus: ^10.1.2
-  
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.1
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "./android/assets/icon/icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#ffffff"
+  adaptive_icon_foreground: "./android/assets/icon/icon.png"
 
 flutter:
   uses-material-design: true

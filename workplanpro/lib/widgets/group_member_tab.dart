@@ -252,7 +252,6 @@ class _GroupMembersTabState extends State<GroupMembersTab> {
             );
           }
 
-          // Default avatar if no user data found
           return ClipOval(
             child: Container(
               color: Colors.grey[200],
