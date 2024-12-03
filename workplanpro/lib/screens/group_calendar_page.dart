@@ -47,7 +47,7 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
       print('Error fetching activities: $e');
       // อาจแสดง Snackbar หรือ Dialog เพื่อแจ้งผู้ใช้
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('ไม่สามารถโหลดกิจกรรมได้')),
+        SnackBar(content: Text('Unable to load activity')),
       );
     }
   }
@@ -81,7 +81,7 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
       // จัดการข้อผิดพลาด
       print('Error saving activity: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('ไม่สามารถบันทึกกิจกรรมได้')),
+        SnackBar(content: Text('Unable to record activity')),
       );
     }
   }
@@ -132,12 +132,14 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
               description: data['description'] ?? '',
               date: (data['date'] as Timestamp).toDate(),
               startTime: TimeOfDay(
-                hour: data['startTimeHour'] ?? 0,
-                minute: data['startTimeMinute'] ?? 0,
+                hour: (data['startTime'] as Map<String, dynamic>)['hour'] ?? 0,
+                minute:
+                    (data['startTime'] as Map<String, dynamic>)['minute'] ?? 0,
               ),
               endTime: TimeOfDay(
-                hour: data['endTimeHour'] ?? 0,
-                minute: data['endTimeMinute'] ?? 0,
+                hour: (data['endTime'] as Map<String, dynamic>)['hour'] ?? 0,
+                minute:
+                    (data['endTime'] as Map<String, dynamic>)['minute'] ?? 0,
               ),
               type: data['type'] ?? 'Personal',
               status: data['status'] ?? 'Pending',
@@ -209,80 +211,152 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
         .toList();
   }
 
+  Widget _buildActivityCard(Activity activity) {
+    return Card(
+      margin: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.green.shade50, Colors.white],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.shade300,
+              blurRadius: 10,
+              offset: Offset(0, 5),
+            )
+          ],
+        ),
+        child: Column(
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.all(16),
+              title: Text(
+                activity.title,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: Color(0xFF0C5217),
+                ),
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(height: 4),
+                  Text(
+                    activity.description,
+                    style: TextStyle(color: Colors.grey.shade700),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.access_time,
+                        size: 16,
+                        color: Colors.green.shade700,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        '${activity.startTime.format(context)} - ${activity.endTime.format(context)}',
+                        style: TextStyle(
+                          color: Colors.grey.shade700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              trailing: Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _getStatusColor(activity.status).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  activity.status,
+                  style: TextStyle(
+                    color: _getStatusColor(activity.status),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              onTap: () => _showActivityDetail(activity),
+            ),
+            if (activity.groupName != null && activity.groupName!.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.only(bottom: 8, left: 16),
+                child: Row(
+                  children: [
+                    Icon(Icons.group, size: 16, color: Colors.grey),
+                    SizedBox(width: 4),
+                    Text(
+                      'From: ${activity.groupName}',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildActivitiesList() {
     if (_isLoading) {
       return Center(child: CircularProgressIndicator());
     }
 
-    final activities = _selectedDay != null
-        ? _getEventsForDay(_selectedDay!)
-        : _getEventsForMonth(_currentMonth);
-
-    if (activities.isEmpty) {
+    if (_activities.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.event_note, size: 64, color: Colors.grey.shade400),
+            Icon(Icons.event_busy, size: 64, color: Colors.grey[400]),
             SizedBox(height: 16),
             Text(
               'No activities found',
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 16,
-              ),
+              style: TextStyle(color: Colors.grey[600], fontSize: 16),
             ),
           ],
         ),
       );
     }
 
+    // กรองกิจกรรมตามวันที่เลือก
+    final selectedActivities =
+        _selectedDay != null ? _getEventsForDay(_selectedDay!) : _activities;
+
     return ListView.builder(
       padding: EdgeInsets.all(16),
-      itemCount: activities.length,
+      itemCount: selectedActivities.length,
       itemBuilder: (context, index) {
-        final activity = activities[index];
-        return Card(
-          margin: EdgeInsets.only(bottom: 12),
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: ListTile(
-            contentPadding: EdgeInsets.all(16),
-            title: Text(
-              activity.title,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
-                color: Color(0xFF0C5217),
-              ),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(height: 4),
-                Text(
-                  activity.description,
-                  style: TextStyle(color: Colors.grey.shade700),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '${activity.startTime.format(context)} - ${activity.endTime.format(context)}',
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-            onTap: () => _showActivityDetail(activity),
-          ),
-        );
+        return _buildActivityCard(selectedActivities[index]);
       },
     );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'Completed':
+        return Colors.green.shade700;
+      case 'In Progress':
+        return Colors.blue.shade700;
+      case 'Pending':
+        return Colors.orange.shade700;
+      default:
+        return Colors.grey.shade700;
+    }
   }
 
   void _showActivityDetail(Activity activity) {
@@ -373,9 +447,9 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
                               Navigator.pop(context);
                               _editActivity(activity);
                             },
-                            child: Text(
-                              'Edit',
-                              style: TextStyle(color: Color(0xFF0C5217)),
+                            child: Text('Edit'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Color(0xFF0C5217),
                             ),
                           ),
                         ],
@@ -404,8 +478,8 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
           ),
           TextButton(
             onPressed: () {
-              _deleteActivity(activity);
               Navigator.pop(context);
+              _deleteActivity(activity);
             },
             child: Text(
               'Delete',
@@ -417,74 +491,102 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
     );
   }
 
-  Future<void> _editActivity(Activity activity) async {
+  void _editActivity(Activity activity) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => AddActivityScreen(
+          activityToEdit: activity,
           groupId: widget.groupId,
+          initialType: ActivityType.Group,
         ),
       ),
     );
 
-    if (result is Activity) {
-      try {
-        await FirebaseFirestore.instance
-            .collection('groups')
-            .doc(widget.groupId)
-            .collection('activities')
-            .doc(activity.id)
-            .update({
-          'title': result.title,
-          'description': result.description,
-          'date': result.date,
-          'startTimeHour': result.startTime.hour,
-          'startTimeMinute': result.startTime.minute,
-          'endTimeHour': result.endTime.hour,
-          'endTimeMinute': result.endTime.minute,
-          'updatedAt': FieldValue.serverTimestamp(),
-          'updatedBy': widget.currentUserEmail,
-        });
-
-        _loadActivities();
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Activity updated successfully')),
-          );
-        }
-      } catch (e) {
-        print('Error updating activity: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error updating activity')),
-          );
-        }
+    if (result == true) {
+      // Reload activities after successful update
+      await _loadActivities();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Activity updated successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     }
   }
 
   Future<void> _deleteActivity(Activity activity) async {
     try {
-      await FirebaseFirestore.instance
-          .collection('groups')
-          .doc(widget.groupId)
-          .collection('activities')
-          .doc(activity.id)
-          .delete();
+      // สร้าง batch operation
+      WriteBatch batch = FirebaseFirestore.instance.batch();
 
-      _loadActivities();
+      // 1. ลบจาก group activities collection
+      if (activity.id != null) {
+        final groupActivityRef = FirebaseFirestore.instance
+            .collection('groups')
+            .doc(widget.groupId)
+            .collection('activities')
+            .doc(activity.id);
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Activity deleted successfully')),
-        );
+        batch.delete(groupActivityRef);
+
+        // 2. ค้นหาและลบจาก main activities collection ด้วย groupId และ timestamp
+        QuerySnapshot mainActivityQuery;
+
+        if (activity.date is Timestamp) {
+          mainActivityQuery = await FirebaseFirestore.instance
+              .collection('activities')
+              .where('groupId', isEqualTo: widget.groupId)
+              .where('date', isEqualTo: activity.date)
+              .get();
+        } else {
+          mainActivityQuery = await FirebaseFirestore.instance
+              .collection('activities')
+              .where('groupId', isEqualTo: widget.groupId)
+              .where('date', isEqualTo: Timestamp.fromDate(activity.date))
+              .get();
+        }
+
+        // ลบทุก activity ที่ตรงกับเงื่อนไข
+        for (var doc in mainActivityQuery.docs) {
+          if (doc.id != activity.id) {
+            // เพิ่มการตรวจสอบ ID
+            final mainData = doc.data() as Map<String, dynamic>;
+            final groupData = activity.toFirestoreMap();
+
+            // เปรียบเทียบข้อมูลเพิ่มเติมเพื่อความแน่นอน
+            if (mainData['title'] == groupData['title'] &&
+                mainData['description'] == groupData['description']) {
+              batch.delete(doc.reference);
+            }
+          }
+        }
+
+        // ดำเนินการลบพร้อมกันทั้งหมด
+        await batch.commit();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Activity deleted successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+
+        // รีโหลดข้อมูลหลังจากลบ
+        await _loadActivities();
       }
     } catch (e) {
       print('Error deleting activity: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting activity')),
+          SnackBar(
+            content: Text('Error deleting activity: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }

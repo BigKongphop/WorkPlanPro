@@ -652,7 +652,7 @@ class _AddActivityScreenState extends State<AddActivityScreen>
           if (_timeToDouble(picked) <= _timeToDouble(_startTime)) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('เวลาสิ้นสุดต้องหลังเวลาเริ่มต้น'),
+                content: Text('The end time must be after the start time.'),
                 backgroundColor: Colors.red,
               ),
             );
@@ -706,18 +706,18 @@ class _AddActivityScreenState extends State<AddActivityScreen>
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('ลบกิจกรรม?'),
+          title: Text('Delete activity?'),
           content: Text(
-              'คุณแน่ใจหรือไม่ว่าต้องการลบกิจกรรมนี้? การดำเนินการนี้ไม่สามารถยกเลิกได้'),
+              'Are you sure you want to delete this activity? This operation cannot be cancelled.'),
           actions: <Widget>[
             TextButton(
-              child: Text('ยกเลิก'),
+              child: Text('cancel'),
               onPressed: () {
                 Navigator.of(context).pop();
               },
             ),
             TextButton(
-              child: Text('ลบ'),
+              child: Text('delete'),
               onPressed: () {
                 Navigator.of(context).pop();
                 _deleteActivity(); // เรียกใช้เมธอด _deleteActivity
@@ -730,53 +730,109 @@ class _AddActivityScreenState extends State<AddActivityScreen>
   }
 
   Future<void> _saveActivity() async {
-    if (_isSaving || !_validateInputs()) return; // ตรวจสอบสถานะการบันทึก
+    if (_isSaving || !_validateInputs()) return;
 
-    _isSaving = true; // ตั้งค่าสถานะการบันทึกเป็น true
+    _isSaving = true;
 
     try {
       final activity = _prepareActivityData();
 
-      // ตรวจสอบว่า activity มี groupId หรือไม่
-      if (widget.groupId != null) {
-        // เพิ่ม groupName เข้าไปในข้อมูลกิจกรรม
-        final groupDoc = await FirebaseFirestore.instance
-            .collection('groups')
-            .doc(widget.groupId)
-            .get();
+      if (widget.activityToEdit != null) {
+        // UPDATE existing activity
+        if (widget.groupId != null) {
+          // Update in group activities
+          final groupActivityRef = FirebaseFirestore.instance
+              .collection('groups')
+              .doc(widget.groupId)
+              .collection('activities')
+              .doc(widget.activityToEdit!.id);
 
-        final groupData = groupDoc.data();
-        final groupName = groupData?['name'] ?? '';
+          // Get the group name
+          final groupDoc = await FirebaseFirestore.instance
+              .collection('groups')
+              .doc(widget.groupId)
+              .get();
+          final groupData = groupDoc.data();
+          final groupName = groupData?['name'] ?? '';
 
-        final activityData = {
-          ...activity.toFirestoreMap(),
-          'groupId': widget.groupId,
-          'groupName': groupName,
-          'isGroupActivity': true
-        };
+          final activityData = {
+            ...activity.toFirestoreMap(),
+            'groupId': widget.groupId,
+            'groupName': groupName,
+            'isGroupActivity': true,
+            'updatedAt': FieldValue.serverTimestamp(),
+          };
 
-        // บันทึกทั้งในกลุ่มและ activities หลัก
-        await FirebaseFirestore.instance
-            .collection('groups')
-            .doc(widget.groupId)
-            .collection('activities')
-            .add(activityData);
+          // Update in both collections using batch
+          WriteBatch batch = FirebaseFirestore.instance.batch();
+          batch.update(groupActivityRef, activityData);
 
-        await FirebaseFirestore.instance
-            .collection('activities')
-            .add(activityData);
+          // Find and update the corresponding activity in main collection
+          final mainActivityQuery = await FirebaseFirestore.instance
+              .collection('activities')
+              .where('groupId', isEqualTo: widget.groupId)
+              .where('date',
+                  isEqualTo: Timestamp.fromDate(widget.activityToEdit!.date))
+              .get();
+
+          for (var doc in mainActivityQuery.docs) {
+            final mainData = doc.data();
+            if (mainData['title'] == widget.activityToEdit!.title &&
+                mainData['description'] == widget.activityToEdit!.description) {
+              batch.update(doc.reference, activityData);
+            }
+          }
+
+          await batch.commit();
+        } else {
+          // Update personal activity
+          await FirebaseFirestore.instance
+              .collection('activities')
+              .doc(widget.activityToEdit!.id)
+              .update(activity.toFirestoreMap());
+        }
       } else {
-        await FirebaseFirestore.instance
-            .collection('activities')
-            .add(activity.toFirestoreMap());
+        // CREATE new activity
+        if (widget.groupId != null) {
+          // Create in group activities
+          final groupDoc = await FirebaseFirestore.instance
+              .collection('groups')
+              .doc(widget.groupId)
+              .get();
+
+          final groupData = groupDoc.data();
+          final groupName = groupData?['name'] ?? '';
+
+          final activityData = {
+            ...activity.toFirestoreMap(),
+            'groupId': widget.groupId,
+            'groupName': groupName,
+            'isGroupActivity': true,
+            'createdAt': FieldValue.serverTimestamp(),
+          };
+
+          await FirebaseFirestore.instance
+              .collection('groups')
+              .doc(widget.groupId)
+              .collection('activities')
+              .add(activityData);
+
+          await FirebaseFirestore.instance
+              .collection('activities')
+              .add(activityData);
+        } else {
+          // Create personal activity
+          await FirebaseFirestore.instance
+              .collection('activities')
+              .add(activity.toFirestoreMap());
+        }
       }
 
-      // แสดง Dialog และปิดหน้าต่าง
       await _showSaveConfirmationDialog();
       Navigator.of(context).pop();
     } catch (error) {
       print('Error saving activity: $error');
-      _isSaving = false; // ตั้งค่าสถานะการบันทึกเป็น false เมื่อเกิดข้อผิดพลาด
+      _isSaving = false;
     }
   }
 

@@ -1,4 +1,3 @@
-//calendar_page.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,6 +12,7 @@ import 'add_activity_screen.dart';
 import '../models/activity.dart';
 import '../services/activity_database.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Calendar extends StatelessWidget {
   DateTime _currentMonth = DateTime.now();
@@ -261,10 +261,8 @@ class _CalendarPageState extends State<CalendarPage> {
           ),
         ),
         subtitle: Text(
-          '${DateFormat('HH:mm').format(activity.date)} - ${activity.description}',
-          style: TextStyle(color: Colors.grey.shade600),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+          '${activity.startTime.format(context)} - ${activity.endTime.format(context)}',
+          style: TextStyle(fontSize: 16.0),
         ),
         trailing: Container(
           padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -1718,32 +1716,30 @@ class _CalendarPageState extends State<CalendarPage> {
 
   Widget _buildActivityList(List<Activity> activities) {
     if (activities.isEmpty) {
-      return SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text(
-            'No activities found',
-            style: TextStyle(color: Colors.grey, fontSize: 16),
-          ),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.event_busy, size: 64, color: Colors.grey.shade400),
+            SizedBox(height: 16),
+            Text(
+              'No activities found',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 16,
+              ),
+            ),
+          ],
         ),
       );
     }
 
-    return SliverPadding(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      sliver: SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (BuildContext context, int index) {
-            return ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: 200, // จำกัดความสูงสูงสุด
-              ),
-              child: _buildActivityCard(activities[index]),
-            );
-          },
-          childCount: activities.length,
-        ),
-      ),
+    return ListView.builder(
+      padding: EdgeInsets.all(16),
+      itemCount: activities.length,
+      itemBuilder: (context, index) {
+        return _buildActivityCard(activities[index]);
+      },
     );
   }
 
@@ -1844,7 +1840,6 @@ class _CalendarPageState extends State<CalendarPage> {
     );
   }
 
-// เพิ่มฟังก์ชันในการแสดงกิจกรรม
   Widget _buildActivitiesList(List<Activity> activities) {
     return ListView.builder(
       itemCount: activities.length,
@@ -1857,7 +1852,7 @@ class _CalendarPageState extends State<CalendarPage> {
             subtitle: Text(DateFormat('dd MMM yyyy').format(activity.date)),
             trailing: Text(activity.status),
             onTap: () => _showActivityDetailsModal(activity, index,
-                activities), // เปลี่ยนเป็นเรียกใช้ _showActivityDetailsModal
+                activities),
           ),
         );
       },
@@ -1907,7 +1902,7 @@ class _CalendarPageState extends State<CalendarPage> {
               },
             ),
     );
-  } // แก้ไขฟังก์ชันแสดงรายละเอียดกิจกรรมให้รับ 3 argument
+  }
 
   void _showActivityDetailsModal(
       Activity activity, int index, List<Activity> activities) {
@@ -2026,7 +2021,7 @@ class _CalendarPageState extends State<CalendarPage> {
         });
       }
     } catch (e) {
-      print('เกิดข้อผิดพลาดในการโหลดกิจกรรม: $e');
+      print('There was an error loading the activity.: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -2059,7 +2054,7 @@ class _CalendarPageState extends State<CalendarPage> {
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('เกิดข้อผิดพลาด: $e'),
+            content: Text('An error occurred.: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -2378,7 +2373,7 @@ class _CalendarPageState extends State<CalendarPage> {
     );
   }
 
-  void _editActivity(Activity activity) async {
+  Future<void> _editActivity(Activity activity) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -2386,76 +2381,61 @@ class _CalendarPageState extends State<CalendarPage> {
       ),
     );
 
-    if (result is Map) {
+    if (result is Activity) {
       try {
-        if (result['action'] == 'update') {
-          Activity updatedActivity = result['activity'];
+        WriteBatch batch = FirebaseFirestore.instance.batch();
 
-          // Validate ID
-          if (updatedActivity.id == null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Activity ID is required for update'),
-                backgroundColor: Colors.red,
-              ),
-            );
-            return;
+        // 1. อัปเดตใน main activities collection
+        await FirebaseFirestore.instance
+            .collection('activities')
+            .doc(activity.id)
+            .update(result.toFirestoreMap());
+
+        // 2. ถ้าเป็น group activity ให้อัปเดตใน group activities ด้วย
+        if (activity.groupId != null) {
+          // ค้นหา activity ใน group collection
+          final groupActivityQuery = await FirebaseFirestore.instance
+              .collection('groups')
+              .doc(activity.groupId)
+              .collection('activities')
+              .where('date', isEqualTo: Timestamp.fromDate(activity.date))
+              .where('title', isEqualTo: activity.title)
+              .get();
+
+          // อัปเดตทุก activity ที่ตรงกัน
+          for (var doc in groupActivityQuery.docs) {
+            batch.update(doc.reference, {
+              ...result.toFirestoreMap(),
+              'groupId': activity.groupId,
+              'isGroupActivity': true,
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
           }
 
-          // Update activity
-          await _activityService.updateActivity(updatedActivity);
+          await batch.commit();
+        }
 
-          // Reload activities
-          await _loadActivities();
+        // รีโหลดข้อมูลหลังจากอัปเดต
+        await _loadActivities();
 
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Text('Activity updated successfully'),
               backgroundColor: Colors.green,
             ),
           );
-        } else if (result['action'] == 'create') {
-          Activity newActivity = result['activity'];
-
-          // Add new activity to the list
-          setState(() {
-            _activities.add(newActivity);
-            _filteredActivities = _filterActivities();
-          });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('New activity created successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        } else if (result['action'] == 'delete') {
-          // จัดการการลบกิจกรรม
-          String? deletedActivityId = result['activityId'];
-
-          if (deletedActivityId != null) {
-            // ลบกิจกรรมออกจากรายการ
-            setState(() {
-              _activities
-                  .removeWhere((activity) => activity.id == deletedActivityId);
-              _filteredActivities = _filterActivities();
-            });
-
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('กิจกรรมถูกลบเรียบร้อย'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
         }
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        print('Error updating activity: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error updating activity: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
@@ -2465,7 +2445,7 @@ class _CalendarPageState extends State<CalendarPage> {
       if (activity.id == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('ไม่พบ ID กิจกรรม'),
+            content: Text('Activity ID not found'),
             backgroundColor: Colors.red,
           ),
         );
@@ -2479,14 +2459,14 @@ class _CalendarPageState extends State<CalendarPage> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('ลบกิจกรรมสำเร็จ'),
+          content: Text('Activity successfully deleted'),
           backgroundColor: Colors.green,
         ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('เกิดข้อผิดพลาดในการลบกิจกรรม: $e'),
+          content: Text('An error occurred deleting an activity.: $e'),
           backgroundColor: Colors.red,
         ),
       );

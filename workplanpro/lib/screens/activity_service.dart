@@ -17,6 +17,62 @@ class ActivityService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  Future<void> addActivity(Activity activity) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw AuthenticationException('User must be authenticated');
+      }
+
+      if (!activity.validate()) {
+        throw ValidationException('Invalid activity details');
+      }
+
+      final activityData = activity.toFirestoreMap();
+
+      if (activity.groupId != null) {
+        // Save activity to both group's activities and main activities collection
+        final batch = _firestore.batch();
+
+        // Add to group's activities
+        final groupActivityRef = _firestore
+            .collection('groups')
+            .doc(activity.groupId)
+            .collection('activities')
+            .doc();
+
+        // Add to main activities collection
+        final mainActivityRef = _firestore.collection('activities').doc();
+
+        final fullActivityData = {
+          ...activityData,
+          'groupId': activity.groupId,
+          'isGroupActivity': true,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+
+        batch.set(groupActivityRef, fullActivityData);
+        batch.set(mainActivityRef, fullActivityData);
+
+        await batch.commit();
+      } else {
+        // Save personal activity
+        await _firestore.collection('activities').add({
+          ...activityData,
+          'isGroupActivity': false,
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      await _logActivity('create', activity);
+    } catch (e) {
+      print('Error adding activity: $e');
+      rethrow;
+    }
+  }
+
   Future<void> _logActivity(String action, Activity activity) async {
     await _firestore.collection('activity_logs').add({
       'userId': activity.userId,
