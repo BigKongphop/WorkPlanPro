@@ -202,22 +202,20 @@ class HomePage extends StatefulWidget {
   _HomePageState createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
-  // State Variables
+class _HomePageState extends State<HomePage> {
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  bool _hasInternetConnection = true;
   List<ActivityModel> _activities = [];
   List<ActivityModel> _filteredActivities = [];
   bool _isLoading = true;
   String _selectedCategory = 'All';
   String _searchQuery = '';
   int _currentIndex = 0;
-  bool _hasInternetConnection = true;
   bool _isDisposed = false;
   final ActivityService _activityService = ActivityService();
   // Controllers
   final TextEditingController _searchController = TextEditingController();
 // Connectivity
-  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   final ThemeData appTheme = ThemeData(
     primarySwatch: Colors.green,
     colorScheme: ColorScheme.fromSeed(
@@ -244,7 +242,6 @@ class _HomePageState extends State<HomePage>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _checkInitialConnectivity();
     _setupConnectivityListener();
     _loadCachedActivities();
@@ -269,17 +266,25 @@ class _HomePageState extends State<HomePage>
     _connectivitySubscription = Connectivity()
         .onConnectivityChanged
         .listen((List<ConnectivityResult> results) {
-      if (!_isDisposed) {
-        final result = results.first;
-        setState(() {
-          _hasInternetConnection = result != ConnectivityResult.none;
-        });
+      setState(() {
+        _hasInternetConnection = results.first != ConnectivityResult.none;
+      });
 
-        if (_hasInternetConnection) {
-          _fetchActivities();
-        }
+      if (_hasInternetConnection) {
+        _fetchActivities();
+      } else {
+        _showOfflineWarning();
       }
     });
+  }
+
+  void _showOfflineWarning() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('No internet. Using cached data.'),
+        backgroundColor: Colors.orange,
+      ),
+    );
   }
 
   Future<void> _loadCachedActivities() async {
@@ -416,7 +421,6 @@ class _HomePageState extends State<HomePage>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _connectivitySubscription?.cancel();
     _searchController.dispose();
     _isDisposed = true;
@@ -853,8 +857,10 @@ class _HomePageState extends State<HomePage>
         TextEditingController(text: activity.title);
     final TextEditingController descriptionController =
         TextEditingController(text: activity.description);
-    String selectedType = activity.type;
-    String selectedStatus = activity.status;
+    String selectedType =
+        activity.type; // ตรวจสอบให้แน่ใจว่าค่านี้มีอยู่ในรายการ
+    String selectedStatus =
+        activity.status; // ตรวจสอบให้แน่ใจว่าค่านี้มีอยู่ในรายการ
 
     showDialog(
       context: context,
@@ -887,7 +893,7 @@ class _HomePageState extends State<HomePage>
                     border: OutlineInputBorder(),
                     labelText: 'Type',
                   ),
-                  items: ['Personal', 'Group', 'Work']
+                  items: ['Personal', 'Group']
                       .map((type) => DropdownMenuItem(
                             value: type,
                             child: Text(type),
@@ -906,7 +912,11 @@ class _HomePageState extends State<HomePage>
                     border: OutlineInputBorder(),
                     labelText: 'Status',
                   ),
-                  items: ['Pending', 'In Progress', 'Completed']
+                  items: [
+                    'Pending',
+                    'In Progress',
+                    'Completed'
+                  ] // ตรวจสอบให้แน่ใจว่ารายการนี้มีค่า selectedStatus
                       .map((status) => DropdownMenuItem(
                             value: status,
                             child: Text(status),
@@ -1182,29 +1192,12 @@ class _HomePageState extends State<HomePage>
       MaterialPageRoute(builder: (context) => AddActivityScreen()),
     );
 
-    if (result is Activity) {
-      try {
-        // สร้าง Activity ใหม่
-        final savedActivity = await _activityService.createActivity(result);
-
-        // รีโหลดรายการกิจกรรม
-        await _fetchActivities();
-
-        // แสดงข้อความแจ้งเตือน
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('สร้างกิจกรรมสำเร็จ'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('เกิดข้อผิดพลาด: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    if (result is ActivityModel) {
+      // คาดหวัง ActivityModel ที่นี่
+      setState(() {
+        _activities.add(result); // result ตอนนี้เป็นประเภท ActivityModel
+        _filteredActivities = _filterActivities();
+      });
     }
   }
 

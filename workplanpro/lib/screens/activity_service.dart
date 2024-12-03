@@ -3,9 +3,93 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:workplanpro/screens/home_page.dart';
 import '../models/activity.dart';
 
+class ValidationException implements Exception {
+  final String message;
+  ValidationException(this.message);
+}
+
+class AuthenticationException implements Exception {
+  final String message;
+  AuthenticationException(this.message);
+}
+
 class ActivityService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  Future<void> _logActivity(String action, Activity activity) async {
+    await _firestore.collection('activity_logs').add({
+      'userId': activity.userId,
+      'activityId': activity.id,
+      'action': action,
+      'timestamp': FieldValue.serverTimestamp(),
+      'details': activity.toMap()
+    });
+  }
+
+  Future<Activity> createOrUpdateActivity(Activity activity,
+      {bool isUpdate = false}) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw AuthenticationException('User  must be authenticated');
+      }
+
+      activity = activity.copyWith(userId: user.uid);
+
+      if (!_validateActivity(activity)) {
+        throw ValidationException('Invalid activity details');
+      }
+
+      final activityData = activity.toFirestoreMap();
+
+      if (isUpdate) {
+        await _verifyActivityOwnership(activity.id!, user.uid);
+        await _firestore
+            .collection('activities')
+            .doc(activity.id)
+            .update(activityData);
+        return activity;
+      } else {
+        final docRef =
+            await _firestore.collection('activities').add(activityData);
+        return activity.copyWith(id: docRef.id);
+      }
+    } catch (e) {
+      print('Activity Service.createOrUpdateActivity: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> _verifyActivityOwnership(
+      String activityId, String userId) async {
+    final doc = await _firestore.collection('activities').doc(activityId).get();
+    if (doc.data()?['userId'] != userId) {
+      throw AuthenticationException('Unauthorized activity modification');
+    }
+  }
+
+  Future<void> safeDeleteActivity(String activityId) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw AuthenticationException('User not authenticated');
+      }
+
+      // Optional: Add ownership verification
+      final activityDoc =
+          await _firestore.collection('activities').doc(activityId).get();
+      if (activityDoc.data()?['userId'] != user.uid) {
+        throw AuthenticationException('Unauthorized deletion');
+      }
+
+      await _firestore.collection('activities').doc(activityId).delete();
+    } catch (e) {
+      print('Safe Delete Error: $e');
+      rethrow;
+    }
+  }
+
 // Sorting Activities
   List<Activity> sortActivities(List<Activity> activities, SortType sortType) {
     switch (sortType) {
@@ -27,21 +111,20 @@ class ActivityService {
     try {
       userId ??= FirebaseAuth.instance.currentUser?.uid;
 
-      if (userId == null) throw Exception('ผู้ใช้ยังไม่ได้เข้าสู่ระบบ');
+      if (userId == null) throw AuthenticationException('No user logged in');
 
       final querySnapshot = await _firestore
           .collection('activities')
           .where('userId', isEqualTo: userId)
-          .orderBy(
-              'date') // เปลี่ยนให้เรียงตามวันเพื่อให้แสดงใน Calendar ได้ง่ายขึ้น
+          .orderBy('date')
           .get();
 
       return querySnapshot.docs
           .map((doc) => Activity.fromMap({...doc.data(), 'id': doc.id}))
           .toList();
     } catch (e) {
-      print('Activity Fetch Error: $e');
-      return []; // คืนค่ากลับเป็นลิสต์ว่างแทนการแสดงผลผิดพลาด
+      print('Fetch Activities Error: $e');
+      return [];
     }
   }
 
@@ -67,44 +150,31 @@ class ActivityService {
 
   // Create Activity
   Future<Activity> createActivity(Activity activity) async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) throw Exception('ผู้ใช้ยังไม่ได้เข้าสู่ระบบ');
-
-      // ตรวจสอบความถูกต้องของข้อมูล
-      if (!_validateActivity(activity)) {
-        throw Exception('ข้อมูลกิจกรรมไม่ถูกต้อง');
+    return handleActivityOperation(() async {
+      // Validate before creating
+      if (!activity.validate()) {
+        throw ValidationException('Invalid activity data');
       }
 
-      // เตรียมข้อมูลสำหรับบันทึก
-      final activityData = {
-        'userId': user.uid,
-        'title': activity.title,
-        'description': activity.description,
-        'date': Timestamp.fromDate(activity.date),
-        'startTime': {
-          'hour': activity.startTime.hour,
-          'minute': activity.startTime.minute
-        },
-        'endTime': {
-          'hour': activity.endTime.hour,
-          'minute': activity.endTime.minute
-        },
-        'type': activity.type,
-        'status': activity.status,
-        'priority': activity.priority,
-        'createdAt': FieldValue.serverTimestamp(),
-      };
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw AuthenticationException('User not authenticated');
 
-      // บันทึกลง Firestore
+      final activityData = activity.toFirestoreMap();
       final docRef =
           await _firestore.collection('activities').add(activityData);
 
-      // คืนค่า Activity พร้อม ID
       return activity.copyWith(id: docRef.id);
+    }, errorMessage: 'Failed to create activity');
+  }
+
+  Future<Activity> handleActivityOperation(
+      Future<Activity> Function() operation,
+      {String errorMessage = 'Operation failed'}) async {
+    try {
+      return await operation();
     } catch (e) {
-      print('เกิดข้อผิดพลาดในการสร้างกิจกรรม: $e');
-      rethrow;
+      print('Activity Service Error: $e');
+      throw Exception(errorMessage);
     }
   }
 
@@ -119,19 +189,41 @@ class ActivityService {
   // Update Activity
   Future<void> updateActivity(Activity activity) async {
     try {
-      if (activity.id == null) throw Exception('Activity ID is required');
-
       // Validate activity before updating
-      if (!activity.validate()) {
-        throw Exception('Invalid activity data');
+      if (activity.id == null) {
+        throw Exception('Activity ID is required');
       }
 
+      if (!activity.validate()) {
+        throw ValidationException('Invalid activity data');
+      }
+
+      // Prepare data for Firestore update
+      final activityData = {
+        'title': activity.title,
+        'description': activity.description,
+        'date': Timestamp.fromDate(activity.date),
+        'startTime': {
+          'hour': activity.startTime.hour,
+          'minute': activity.startTime.minute,
+        },
+        'endTime': {
+          'hour': activity.endTime.hour,
+          'minute': activity.endTime.minute,
+        },
+        'type': activity.type,
+        'status': activity.status,
+        'priority': activity.priority,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      // Perform update
       await _firestore
           .collection('activities')
           .doc(activity.id)
-          .update(activity.toMap());
+          .update(activityData);
     } catch (e) {
-      print('Update Activity Error: $e');
+      // Rethrow to allow caller to handle
       rethrow;
     }
   }
@@ -139,10 +231,15 @@ class ActivityService {
   // Delete Activity
   Future<void> deleteActivity(String activityId) async {
     try {
+      // ตรวจสอบว่ามี User ล็อกอินอยู่หรือไม่
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('User not logged in');
+
+      // ลบกิจกรรมจาก Firestore
       await _firestore.collection('activities').doc(activityId).delete();
     } catch (e) {
-      print('Delete Activity Error: $e');
-      rethrow;
+      print('Error deleting activity: $e');
+      rethrow; // ส่งต่อข้อผิดพลาดเพื่อให้ผู้เรียกจัดการต่อ
     }
   }
 

@@ -3,6 +3,37 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/activity.dart';
+import '../screens/activity_service.dart';
+
+class ActivityModel {
+  final String id;
+  final String title;
+  final String description;
+  final DateTime date;
+  final String type;
+  final String status;
+
+  ActivityModel({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.date,
+    required this.type,
+    this.status = 'Pending',
+  });
+
+  // ฟังก์ชันสำหรับแปลง Activity เป็น ActivityModel
+  factory ActivityModel.fromActivity(Activity activity) {
+    return ActivityModel(
+      id: activity.id ?? '',
+      title: activity.title,
+      description: activity.description,
+      date: activity.date,
+      type: activity.type,
+      status: activity.status,
+    );
+  }
+}
 
 class AddActivityScreen extends StatefulWidget {
   final Activity? activityToEdit;
@@ -26,6 +57,7 @@ class _AddActivityScreenState extends State<AddActivityScreen>
   String _selectedType = 'Personal';
   String _selectedPriority = 'Low';
   String _selectedStatus = 'Pending';
+  final activityService = ActivityService();
 
   // Animation Controllers
   late AnimationController _animationController;
@@ -62,18 +94,28 @@ class _AddActivityScreenState extends State<AddActivityScreen>
     _animationController.forward();
   }
 
-  void _deleteActivity() {
-    if (widget.activityToEdit != null) {
-      // ถ้ามีกิจกรรมที่กำลังแก้ไข ให้ส่งค่า 'delete' กลับ
-      Navigator.of(context).pop('delete');
-    } else {
-      // หากไม่มีกิจกรรมเดิม ให้แสดงข้อความแจ้งเตือน
+  void _deleteActivity() async {
+    if (widget.activityToEdit == null || widget.activityToEdit!.id == null) {
+      _showErrorSnackBar('No activity to delete');
+      return;
+    }
+
+    try {
+      final activityService = ActivityService();
+      await activityService.safeDeleteActivity(widget.activityToEdit!.id!);
+
+      // Consistent navigation and feedback
+      Navigator.of(context)
+          .pop({'action': 'delete', 'activityId': widget.activityToEdit!.id});
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('ไม่มีกิจกรรมที่สามารถลบได้'),
-          backgroundColor: Colors.red,
+          content: Text('Activity deleted successfully'),
+          backgroundColor: Colors.green,
         ),
       );
+    } catch (e) {
+      _showErrorSnackBar('Delete failed: $e');
     }
   }
 
@@ -83,6 +125,10 @@ class _AddActivityScreenState extends State<AddActivityScreen>
   }
 
   void _initializeControllers() {
+    _selectedDate = widget.activityToEdit?.date ?? DateTime.now();
+    if (_selectedDate.isBefore(DateTime.now())) {
+      _selectedDate = DateTime.now(); // ปรับให้เป็นวันที่ปัจจุบันถ้าเป็นอดีต
+    }
     // Initialize text controllers
     _titleController =
         TextEditingController(text: widget.activityToEdit?.title ?? '');
@@ -346,7 +392,6 @@ class _AddActivityScreenState extends State<AddActivityScreen>
       children: [
         _buildTypeDropdown(),
         SizedBox(height: 16),
-        _buildPriorityDropdown(),
         SizedBox(height: 16),
         _buildStatusDropdown(),
       ],
@@ -395,23 +440,6 @@ class _AddActivityScreenState extends State<AddActivityScreen>
           color: Color(0xFF0C5217),
         ),
       ),
-    );
-  }
-
-  Widget _buildPriorityDropdown() {
-    return DropdownButtonFormField<String>(
-      value: _selectedPriority,
-      decoration: InputDecoration(
-        labelText: 'Priority',
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-      items: ['Low', 'Medium', 'High']
-          .map((priority) =>
-              DropdownMenuItem(value: priority, child: Text(priority)))
-          .toList(),
-      onChanged: (value) {
-        setState(() => _selectedPriority = value!);
-      },
     );
   }
 
@@ -516,27 +544,32 @@ class _AddActivityScreenState extends State<AddActivityScreen>
   Widget _buildDatePicker() {
     return Container(
       decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.green.shade50, Colors.green.shade100],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(15),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.green.shade200.withOpacity(0.5),
-              spreadRadius: 1,
-              blurRadius: 5,
-              offset: Offset(0, 3),
-            )
-          ]),
+        gradient: LinearGradient(
+          colors: [Colors.green.shade50, Colors.green.shade100],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.shade200.withOpacity(0.5),
+            spreadRadius: 1,
+            blurRadius: 5,
+            offset: Offset(0, 3),
+          )
+        ],
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(15),
         onTap: () async {
-          final pickedDate = await showDatePicker(
+          final DateTime now = DateTime.now();
+          final DateTime initialDate = _selectedDate.isBefore(now)
+              ? now
+              : _selectedDate; // Ensure initial date is not before today
+          final DateTime? picked = await showDatePicker(
             context: context,
-            initialDate: _selectedDate,
-            firstDate: DateTime.now(),
+            initialDate: initialDate,
+            firstDate: now, // Set firstDate to now
             lastDate: DateTime(2101),
             builder: (context, child) {
               return Theme(
@@ -551,8 +584,8 @@ class _AddActivityScreenState extends State<AddActivityScreen>
               );
             },
           );
-          if (pickedDate != null) {
-            setState(() => _selectedDate = pickedDate);
+          if (picked != null) {
+            setState(() => _selectedDate = picked);
           }
         },
         child: InputDecorator(
@@ -561,8 +594,9 @@ class _AddActivityScreenState extends State<AddActivityScreen>
             labelStyle: TextStyle(color: Color(0xFF0C5217).withOpacity(0.7)),
             prefixIcon: Icon(Icons.calendar_today, color: Color(0xFF0C5217)),
             border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(15),
-                borderSide: BorderSide.none),
+              borderRadius: BorderRadius.circular(15),
+              borderSide: BorderSide.none,
+            ),
           ),
           child: Text(
             DateFormat('dd MMM yyyy').format(_selectedDate),
@@ -575,10 +609,14 @@ class _AddActivityScreenState extends State<AddActivityScreen>
   }
 
   Future<void> _selectDate(BuildContext context) async {
+    final DateTime now = DateTime.now();
+    final DateTime initialDate = _selectedDate.isBefore(now)
+        ? now
+        : _selectedDate; // ตรวจสอบให้แน่ใจว่า initialDate ไม่ก่อนวันนี้
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime.now(),
+      initialDate: initialDate,
+      firstDate: DateTime.now(), // หรือวันที่ที่คุณต้องการ
       lastDate: DateTime(2101),
     );
     if (picked != null && picked != _selectedDate) {
@@ -722,41 +760,114 @@ class _AddActivityScreenState extends State<AddActivityScreen>
     );
   }
 
-  void _saveActivity() {
-    // ตรวจสอบความถูกต้องของข้อมูล
-    if (_titleController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('กรุณากรอกชื่อกิจกรรม'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
+  void _saveActivity() async {
+    if (!_validateInputs()) return;
+
+    final activity = _prepareActivityData();
+    final activityService = ActivityService();
+
+    try {
+      final savedActivity = await _performActivityOperation(
+          activityService, activity, widget.activityToEdit != null);
+
+      // แปลง Activity เป็น ActivityModel
+      final activityModel = ActivityModel.fromActivity(savedActivity);
+
+      // เรียก callback ด้วย ActivityModel
+      widget.onActivitySaved?.call(activityModel as Activity);
+
+      _handleSuccessfulSave(widget.activityToEdit == null ? 'create' : 'update',
+          activityModel as Activity);
+    } catch (e) {
+      _showErrorSnackBar('Error: ${e.toString()}');
+    }
+  }
+
+  Future<Activity> _performActivityOperation(
+      ActivityService service, Activity activity, bool isUpdate) async {
+    try {
+      return await service.createOrUpdateActivity(activity, isUpdate: isUpdate);
+    } catch (e) {
+      // Rethrow with more context
+      throw Exception('Failed to ${isUpdate ? 'update' : 'create'} activity');
+    }
+  }
+
+  void _editActivity(Activity activity) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddActivityScreen(activityToEdit: activity),
+      ),
+    );
+
+    if (result is Map) {
+      // Update activity logic
+    }
+  }
+
+  bool _validateInputs() {
+    if (_titleController.text.trim().isEmpty) {
+      _showErrorSnackBar('Please enter a title');
+      return false;
     }
 
-    // ตรวจสอบเวลาอย่างละเอียด
+    if (_descriptionController.text.trim().isEmpty) {
+      _showErrorSnackBar('Please enter a description');
+      return false;
+    }
+
     if (!_validateTimeRange()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('เวลาสิ้นสุดต้องหลังเวลาเริ่มต้น'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
+      _showErrorSnackBar('End time must be after start time');
+      return false;
     }
 
-    final activity = Activity(
-      title: _titleController.text,
-      description: _descriptionController.text,
+    return true;
+  }
+
+  Activity _prepareActivityData() {
+    return Activity(
+      id: widget.activityToEdit?.id,
+      title: _titleController.text.trim(),
+      description: _descriptionController.text.trim(),
       date: _selectedDate,
       startTime: _startTime,
       endTime: _endTime,
       type: _selectedType,
-      priority: _selectedPriority,
       status: _selectedStatus,
+      priority: _selectedPriority,
     );
+  }
 
-    // ส่งกลับข้อมูลกิจกรรม
-    Navigator.of(context).pop(activity);
+  void _handleSuccessfulSave(String action, Activity savedActivity) {
+    // เรียก callback หากมี
+    widget.onActivitySaved?.call(savedActivity);
+
+    Navigator.of(context).pop({'action': action, 'activity': savedActivity});
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Activity ${action}d successfully'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  void _showValidationError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
 }

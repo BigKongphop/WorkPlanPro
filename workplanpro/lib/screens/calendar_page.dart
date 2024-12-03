@@ -162,34 +162,18 @@ class _CalendarPageState extends State<CalendarPage> {
 
   Future<void> _loadActivities() async {
     try {
-      setState(() => _isLoading = true);
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final activities =
-            await _activityService.fetchActivities(userId: user.uid);
-        setState(() {
-          _activities = activities.isNotEmpty ? activities : [];
-          _selectedCategory = 'All'; // ตั้งค่าเริ่มต้นเป็น All
-          _filteredActivities = _filterActivities(); // กรองกิจกรรมทันที
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _activities = [];
-          _filteredActivities = [];
-          _isLoading = false;
-        });
-      }
+      // Fetch activities for the current user
+      final activities = await _activityService.fetchActivities();
+
+      setState(() {
+        _activities = activities;
+        _filteredActivities = _filterActivities();
+      });
     } catch (e) {
       print('Error loading activities: $e');
-      setState(() {
-        _activities = [];
-        _filteredActivities = [];
-        _isLoading = false;
-      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('เกิดข้อผิดพลาดในการโหลดกิจกรรม: $e'),
+          content: Text('Failed to load activities'),
           backgroundColor: Colors.red,
         ),
       );
@@ -1465,13 +1449,52 @@ class _CalendarPageState extends State<CalendarPage> {
     );
   }
 
+  void _handleActivityUpdate(Map<String, dynamic> result) {
+    if (result == null) return;
+
+    switch (result['action']) {
+      case 'create':
+        _addNewActivity(result['activity']);
+        break;
+      case 'update':
+        _updateExistingActivity(result['activity']);
+        break;
+      case 'delete':
+        _removeActivity(result['activityId']);
+        break;
+    }
+  }
+
+  void _addNewActivity(Activity newActivity) {
+    setState(() {
+      _activities.add(newActivity);
+      _filteredActivities = _filterActivities();
+    });
+  }
+
+  void _updateExistingActivity(Activity updatedActivity) {
+    setState(() {
+      final index = _activities.indexWhere((a) => a.id == updatedActivity.id);
+      if (index != -1) {
+        _activities[index] = updatedActivity;
+        _filteredActivities = _filterActivities();
+      }
+    });
+  }
+
+  void _removeActivity(String activityId) {
+    setState(() {
+      _activities.removeWhere((a) => a.id == activityId);
+      _filteredActivities = _filterActivities();
+    });
+  }
+
   List<Activity> _getEventsForDay(DateTime day) {
-    return _activities
-        .where((activity) =>
-            activity.date.year == day.year &&
-            activity.date.month == day.month &&
-            activity.date.day == day.day)
-        .toList();
+    return _activities.where((activity) {
+      return activity.date.year == day.year &&
+          activity.date.month == day.month &&
+          activity.date.day == day.day;
+    }).toList();
   }
 
   void _showDayActivities(DateTime selectedDay) {
@@ -1936,10 +1959,6 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   List<Activity> _filterActivities() {
-    // ถ้าไม่มีกิจกรรมเลย ให้ return list ว่าง
-    if (_activities.isEmpty) return [];
-
-    // กรองกิจกรรมโดยค่าเริ่มต้นเป็น All
     return _activities.where((activity) {
       return _selectedCategory == 'All' || activity.type == _selectedCategory;
     }).toList();
@@ -2293,11 +2312,77 @@ class _CalendarPageState extends State<CalendarPage> {
       ),
     );
 
-    if (result == 'delete') {
-      _deleteActivity(activity);
-    } else if (result is Activity) {
-      await _activityService.updateActivity(result);
-      await _loadActivities(); // รีโหลดกิจกรรมหลังจากอัปเดต
+    if (result is Map) {
+      try {
+        if (result['action'] == 'update') {
+          Activity updatedActivity = result['activity'];
+
+          // Validate ID
+          if (updatedActivity.id == null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Activity ID is required for update'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            return;
+          }
+
+          // Update activity
+          await _activityService.updateActivity(updatedActivity);
+
+          // Reload activities
+          await _loadActivities();
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Activity updated successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else if (result['action'] == 'create') {
+          Activity newActivity = result['activity'];
+
+          // Add new activity to the list
+          setState(() {
+            _activities.add(newActivity);
+            _filteredActivities = _filterActivities();
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('New activity created successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else if (result['action'] == 'delete') {
+          // จัดการการลบกิจกรรม
+          String? deletedActivityId = result['activityId'];
+
+          if (deletedActivityId != null) {
+            // ลบกิจกรรมออกจากรายการ
+            setState(() {
+              _activities
+                  .removeWhere((activity) => activity.id == deletedActivityId);
+              _filteredActivities = _filterActivities();
+            });
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('กิจกรรมถูกลบเรียบร้อย'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
