@@ -22,9 +22,10 @@ class ActivityModel {
     this.status = 'Pending',
   });
 
+  // ฟังก์ชันสำหรับแปลง Activity เป็น ActivityModel
   factory ActivityModel.fromActivity(Activity activity) {
     return ActivityModel(
-      id: activity.id ?? '',
+      id: activity.id ?? '', // ใช้ ID ที่เป็น null หรือให้เป็น ''
       title: activity.title,
       description: activity.description,
       date: activity.date,
@@ -38,12 +39,16 @@ class AddActivityScreen extends StatefulWidget {
   final Activity? activityToEdit;
   final Function(Activity)? onActivitySaved;
   final String? groupId;
+  final String? activityType;
+  final ActivityType? initialType;
 
   const AddActivityScreen({
     Key? key,
     this.activityToEdit,
     this.onActivitySaved,
     this.groupId,
+    this.activityType,
+    this.initialType = ActivityType.Personal,
   }) : super(key: key);
 
   @override
@@ -52,23 +57,26 @@ class AddActivityScreen extends StatefulWidget {
 
 class _AddActivityScreenState extends State<AddActivityScreen>
     with SingleTickerProviderStateMixin {
+  // เพิ่ม SingleTickerProviderStateMixin
   late TextEditingController _titleController;
   late TextEditingController _descriptionController;
   late DateTime _selectedDate;
   late TimeOfDay _startTime;
   late TimeOfDay _endTime;
-  String _selectedType = 'Personal';
   String _selectedPriority = 'Low';
   String _selectedStatus = 'Pending';
   final activityService = ActivityService();
-
+  late ActivityType _selectedType;
+  // Animation Controllers
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
+    _selectedType = widget.initialType!;
     _initializeControllers();
     _titleController =
         TextEditingController(text: widget.activityToEdit?.title ?? '');
@@ -78,11 +86,13 @@ class _AddActivityScreenState extends State<AddActivityScreen>
     _startTime = widget.activityToEdit?.startTime ?? TimeOfDay.now();
     _endTime = widget.activityToEdit?.endTime ??
         TimeOfDay(hour: (_startTime.hour + 1) % 24, minute: _startTime.minute);
+    // Setup Animation Controller
     _animationController = AnimationController(
       duration: Duration(milliseconds: 500),
-      vsync: this,
+      vsync: this, // 'this' now correctly refers to TickerProvider
     );
 
+    // Create animations
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
         CurvedAnimation(parent: _animationController, curve: Curves.easeInOut));
 
@@ -90,7 +100,23 @@ class _AddActivityScreenState extends State<AddActivityScreen>
         .animate(CurvedAnimation(
             parent: _animationController, curve: Curves.easeOutQuad));
 
+    // Start the animation
     _animationController.forward();
+  }
+
+  Activity _createActivity() {
+    return Activity(
+      id: widget.activityToEdit?.id,
+      title: _titleController.text,
+      description: _descriptionController.text,
+      date: _selectedDate,
+      startTime: _startTime,
+      endTime: _endTime,
+      type: _selectedType == ActivityType.Group ? 'Group' : 'Personal',
+      status: _selectedStatus,
+      priority: _selectedPriority,
+      groupId: widget.groupId, // เพิ่ม groupId หากเป็น Group Activity
+    );
   }
 
   void _deleteActivity() async {
@@ -103,6 +129,7 @@ class _AddActivityScreenState extends State<AddActivityScreen>
       final activityService = ActivityService();
       await activityService.safeDeleteActivity(widget.activityToEdit!.id!);
 
+      // Consistent navigation and feedback
       Navigator.of(context)
           .pop({'action': 'delete', 'activityId': widget.activityToEdit!.id});
 
@@ -118,31 +145,35 @@ class _AddActivityScreenState extends State<AddActivityScreen>
   }
 
   bool _validateTime() {
+    // ตรวจสอบว่าเวลาเริ่มต้นน้อยกว่าเวลาสิ้นสุด
     return _timeToDouble(_startTime) < _timeToDouble(_endTime);
   }
 
   void _initializeControllers() {
     _selectedDate = widget.activityToEdit?.date ?? DateTime.now();
     if (_selectedDate.isBefore(DateTime.now())) {
-      _selectedDate = DateTime.now();
+      _selectedDate = DateTime.now(); // ปรับให้เป็นวันที่ปัจจุบันถ้าเป็นอดีต
     }
+    // Initialize text controllers
     _titleController =
         TextEditingController(text: widget.activityToEdit?.title ?? '');
     _descriptionController =
         TextEditingController(text: widget.activityToEdit?.description ?? '');
 
+    // Initialize date and time
     _selectedDate = widget.activityToEdit?.date ?? DateTime.now();
     _startTime = widget.activityToEdit?.startTime ?? TimeOfDay.now();
     _endTime = widget.activityToEdit?.endTime ??
         TimeOfDay(hour: (_startTime.hour + 1) % 24, minute: _startTime.minute);
 
-    _selectedType = widget.activityToEdit?.type ?? 'Personal';
+    // Initialize other fields
     _selectedPriority = widget.activityToEdit?.priority ?? 'Low';
     _selectedStatus = widget.activityToEdit?.status ?? 'Pending';
   }
 
   @override
   void dispose() {
+    // ปิด Controller เมื่อออกจากหน้าจอ
     _titleController.dispose();
     _descriptionController.dispose();
     _animationController?.dispose();
@@ -210,6 +241,7 @@ class _AddActivityScreenState extends State<AddActivityScreen>
           Icons.arrow_drop_down_circle_outlined,
           color: Color(0xFF0C5217),
         ),
+        // Custom Search Functionality
         onTap: () {
           showDialog(
             context: context,
@@ -350,6 +382,7 @@ class _AddActivityScreenState extends State<AddActivityScreen>
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Existing form fields with responsive sizing
               _buildTextField(_titleController, 'Title', Icons.title),
               SizedBox(height: 16),
               _buildTextField(
@@ -406,31 +439,6 @@ class _AddActivityScreenState extends State<AddActivityScreen>
               offset: Offset(0, 3),
             )
           ]),
-      child: DropdownButtonFormField<String>(
-        value: _selectedType,
-        decoration: InputDecoration(
-          labelText: 'Activity Type',
-          prefixIcon: Icon(Icons.category_outlined, color: Color(0xFF0C5217)),
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: BorderSide.none),
-        ),
-        dropdownColor: Colors.white,
-        style: TextStyle(color: Color(0xFF0C5217), fontWeight: FontWeight.w600),
-        items: ['Personal', 'Group']
-            .map((type) => DropdownMenuItem(
-                value: type,
-                child:
-                    Text(type, style: TextStyle(color: Colors.green.shade800))))
-            .toList(),
-        onChanged: (value) {
-          setState(() => _selectedType = value!);
-        },
-        icon: Icon(
-          Icons.arrow_drop_down_circle_outlined,
-          color: Color(0xFF0C5217),
-        ),
-      ),
     );
   }
 
@@ -556,11 +564,11 @@ class _AddActivityScreenState extends State<AddActivityScreen>
           final DateTime now = DateTime.now();
           final DateTime initialDate = _selectedDate.isBefore(now)
               ? now
-              : _selectedDate;
+              : _selectedDate; // Ensure initial date is not before today
           final DateTime? picked = await showDatePicker(
             context: context,
             initialDate: initialDate,
-            firstDate: now,
+            firstDate: now, // Set firstDate to now
             lastDate: DateTime(2101),
             builder: (context, child) {
               return Theme(
@@ -603,11 +611,11 @@ class _AddActivityScreenState extends State<AddActivityScreen>
     final DateTime now = DateTime.now();
     final DateTime initialDate = _selectedDate.isBefore(now)
         ? now
-        : _selectedDate;
+        : _selectedDate; // ตรวจสอบให้แน่ใจว่า initialDate ไม่ก่อนวันนี้
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
-      firstDate: DateTime.now(),
+      firstDate: DateTime.now(), // หรือวันที่ที่คุณต้องการ
       lastDate: DateTime(2101),
     );
     if (picked != null && picked != _selectedDate) {
@@ -634,15 +642,17 @@ class _AddActivityScreenState extends State<AddActivityScreen>
       setState(() {
         if (isStartTime) {
           _startTime = picked;
+          // ปรับเวลาสิ้นสุดให้หลังเวลาเริ่มต้น
           if (_timeToDouble(picked) >= _timeToDouble(_endTime)) {
             _endTime =
                 TimeOfDay(hour: (picked.hour + 1) % 24, minute: picked.minute);
           }
         } else {
+          // ตรวจสอบว่าเวลาสิ้นสุดหลังเวลาเริ่มต้น
           if (_timeToDouble(picked) <= _timeToDouble(_startTime)) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('The end time must be after the start time.'),
+                content: Text('เวลาสิ้นสุดต้องหลังเวลาเริ่มต้น'),
                 backgroundColor: Colors.red,
               ),
             );
@@ -691,56 +701,26 @@ class _AddActivityScreenState extends State<AddActivityScreen>
     );
   }
 
-  void _showSaveConfirmationDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(widget.activityToEdit == null
-              ? 'Save Activity?'
-              : 'Update Activity?'),
-          content: Text(
-              'Are you sure you want to ${widget.activityToEdit == null ? 'save' : 'update'} this activity?'),
-          actions: <Widget>[
-            TextButton(
-              child: Text('Cancel'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            TextButton(
-              child: Text('Confirm'),
-              onPressed: () {
-                Navigator.of(context).pop();
-                _saveActivity();
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   void _showDeleteConfirmationDialog() {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Delete activity?'),
+          title: Text('ลบกิจกรรม?'),
           content: Text(
-              'Are you sure you want to delete this activity? This operation cannot be cancelled.'),
+              'คุณแน่ใจหรือไม่ว่าต้องการลบกิจกรรมนี้? การดำเนินการนี้ไม่สามารถยกเลิกได้'),
           actions: <Widget>[
             TextButton(
-              child: Text('Cancel'),
+              child: Text('ยกเลิก'),
               onPressed: () {
                 Navigator.of(context).pop();
               },
             ),
             TextButton(
-              child: Text('Delete'),
+              child: Text('ลบ'),
               onPressed: () {
                 Navigator.of(context).pop();
-                _deleteActivity();
+                _deleteActivity(); // เรียกใช้เมธอด _deleteActivity
               },
             ),
           ],
@@ -750,12 +730,16 @@ class _AddActivityScreenState extends State<AddActivityScreen>
   }
 
   Future<void> _saveActivity() async {
-    if (!_validateInputs()) return;
+    if (_isSaving || !_validateInputs()) return; // ตรวจสอบสถานะการบันทึก
+
+    _isSaving = true; // ตั้งค่าสถานะการบันทึกเป็น true
 
     try {
       final activity = _prepareActivityData();
 
+      // ตรวจสอบว่า activity มี groupId หรือไม่
       if (widget.groupId != null) {
+        // เพิ่ม groupName เข้าไปในข้อมูลกิจกรรม
         final groupDoc = await FirebaseFirestore.instance
             .collection('groups')
             .doc(widget.groupId)
@@ -771,6 +755,7 @@ class _AddActivityScreenState extends State<AddActivityScreen>
           'isGroupActivity': true
         };
 
+        // บันทึกทั้งในกลุ่มและ activities หลัก
         await FirebaseFirestore.instance
             .collection('groups')
             .doc(widget.groupId)
@@ -786,10 +771,33 @@ class _AddActivityScreenState extends State<AddActivityScreen>
             .add(activity.toFirestoreMap());
       }
 
-      Navigator.pop(context, activity);
-    } catch (e) {
-      _showErrorSnackBar('Error saving activity: $e');
+      // แสดง Dialog และปิดหน้าต่าง
+      await _showSaveConfirmationDialog();
+      Navigator.of(context).pop();
+    } catch (error) {
+      print('Error saving activity: $error');
+      _isSaving = false; // ตั้งค่าสถานะการบันทึกเป็น false เมื่อเกิดข้อผิดพลาด
     }
+  }
+
+  Future<void> _showSaveConfirmationDialog() async {
+    return showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Activity Saved'),
+          content: Text('Your activity has been saved.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<Activity> _performActivityOperation(
@@ -797,6 +805,7 @@ class _AddActivityScreenState extends State<AddActivityScreen>
     try {
       return await service.createOrUpdateActivity(activity, isUpdate: isUpdate);
     } catch (e) {
+      // Rethrow with more context
       throw Exception('Failed to ${isUpdate ? 'update' : 'create'} activity');
     }
   }
@@ -810,6 +819,7 @@ class _AddActivityScreenState extends State<AddActivityScreen>
     );
 
     if (result is Map) {
+      // Update activity logic
     }
   }
 
@@ -840,13 +850,13 @@ class _AddActivityScreenState extends State<AddActivityScreen>
       date: _selectedDate,
       startTime: _startTime,
       endTime: _endTime,
-      type: _selectedType,
       status: _selectedStatus,
       priority: _selectedPriority,
     );
   }
 
   void _handleSuccessfulSave(String action, Activity savedActivity) {
+    // เรียก callback หากมี
     widget.onActivitySaved?.call(savedActivity);
 
     Navigator.of(context).pop({'action': action, 'activity': savedActivity});

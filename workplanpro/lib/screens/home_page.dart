@@ -287,6 +287,25 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  void _navigateToAddActivity() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddActivityScreen(
+          initialType: ActivityType.Personal, // กำหนดเป็น Personal โดยอัตโนมัติ
+        ),
+      ),
+    );
+
+    if (result is Activity) {
+      // เพิ่มกิจกรรมใหม่
+      setState(() {
+        _activities.add(result as ActivityModel);
+        _filteredActivities = _filterActivities();
+      });
+    }
+  }
+
   Future<void> _loadCachedActivities() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -678,22 +697,18 @@ class _HomePageState extends State<HomePage> {
   String _selectedStatus = 'All';
   List<ActivityModel> _filterActivities() {
     return _activities.where((activity) {
-      // Filter by Category
-      bool matchesCategory =
-          _selectedCategory == 'All' || activity.type == _selectedCategory;
+      bool matchesCategory = _selectedCategory == 'All' ||
+          activity.type == _selectedCategory ||
+          // เพิ่มเงื่อนไขสำหรับ Group
+          (_selectedCategory == 'Group' && activity.type == 'Group');
 
-      // Filter by Search Query
       bool matchesSearch = _searchQuery.isEmpty ||
           activity.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           activity.description
               .toLowerCase()
               .contains(_searchQuery.toLowerCase());
 
-      // Filter by Status (เพิ่มการกรองสถานะ)
-      bool matchesStatus =
-          _selectedStatus == 'All' || activity.status == _selectedStatus;
-
-      return matchesCategory && matchesSearch && matchesStatus;
+      return matchesCategory && matchesSearch;
     }).toList()
       ..sort((a, b) {
         switch (_sortBy) {

@@ -2033,28 +2033,29 @@ class _CalendarPageState extends State<CalendarPage> {
 
   List<Activity> _filterActivities() {
     return _activities.where((activity) {
-      return _selectedCategory == 'All' || activity.type == _selectedCategory;
+      return _selectedCategory == 'All' ||
+          activity.type == _selectedCategory ||
+          (_selectedCategory == 'Group' && activity.type == 'Group');
     }).toList();
   }
 
   void _navigateToAddActivity() async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => AddActivityScreen()),
+      MaterialPageRoute(
+        builder: (context) => AddActivityScreen(
+          initialType: ActivityType.Personal, // กำหนดเป็น Personal โดยอัตโนมัติ
+        ),
+      ),
     );
 
     if (result is Activity) {
       try {
         // สร้าง Activity ใหม่
-        await _activityService.createActivity(result);
-        // รีโหลดรายการกิจกรรม
-        await _loadActivities(); // เพิ่ม () เพื่อเรียกใช้ฟังก์ชัน
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('สร้างกิจกรรมสำเร็จ'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        setState(() {
+          _activities.add(result);
+          _filteredActivities = _filterActivities();
+        });
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

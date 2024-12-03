@@ -5,8 +5,10 @@ import 'package:workplanpro/screens/activity_service.dart';
 
 enum SortType { nearestDate, newest, oldest }
 
+enum ActivityType { Personal, Group }
+
 class Activity {
-  final String? id;
+  late final String? id;
   final String title;
   final String? groupId;
   final String? groupName;
@@ -36,6 +38,7 @@ class Activity {
     String? userId,
   }) : userId = userId ?? FirebaseAuth.instance.currentUser?.uid;
 
+  // Convert to Map for Firestore
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -53,28 +56,35 @@ class Activity {
 
   static DateTime _parseDate(dynamic dateData) {
     try {
+      // กรณี Timestamp จาก Firestore
       if (dateData is Timestamp) {
         return dateData.toDate();
       }
 
+      // กรณี String ISO8601
       if (dateData is String) {
         return DateTime.parse(dateData);
       }
 
+      // กรณี Map (สำหรับบางรูปแบบข้อมูล)
       if (dateData is Map) {
+        // ตรวจสอบว่ามี seconds หรือ nanoseconds หรือไม่
         if (dateData.containsKey('seconds')) {
           return DateTime.fromMillisecondsSinceEpoch(
               (dateData['seconds'] * 1000).toInt());
         }
       }
 
+      // กรณี int (timestamp)
       if (dateData is int) {
         return DateTime.fromMillisecondsSinceEpoch(dateData);
       }
 
+      // หากไม่ตรงเงื่อนไขใดๆ ให้ใช้วันปัจจุบัน
       print('Unsupported date format: $dateData');
       return DateTime.now();
     } catch (e) {
+      // จัดการข้อผิดพลาดในการแปลง
       print('Error parsing date: $e, Original data: $dateData');
       return DateTime.now();
     }
@@ -84,6 +94,7 @@ class Activity {
     return value ?? defaultValue;
   }
 
+  // Create from Firestore Map
   factory Activity.fromMap(Map<String, dynamic> map) {
     return Activity(
         id: _safeConvert(map['id'], map['docId']),
@@ -98,6 +109,7 @@ class Activity {
         userId: map['userId']);
   }
 
+  // Helper method to parse TimeOfDay
   static TimeOfDay _parseTimeOfDay(dynamic timeData) {
     try {
       if (timeData == null) return TimeOfDay.now();
@@ -109,6 +121,7 @@ class Activity {
       }
 
       if (timeData is String) {
+        // กรณีเป็น String เช่น "14:30"
         List<String> parts = timeData.split(':');
         if (parts.length == 2) {
           return TimeOfDay(
@@ -123,6 +136,7 @@ class Activity {
     }
   }
 
+  // Copy method for immutability
   Activity copyWith(
       {String? id,
       String? title,
@@ -147,6 +161,7 @@ class Activity {
         userId: userId ?? this.userId);
   }
 
+  // Validation method
   bool validate() {
     return _validateBasicFields() && _validateTimeConstraints();
   }

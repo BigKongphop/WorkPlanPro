@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
+import 'package:workplanpro/screens/activity_service.dart';
 import '../models/activity.dart';
 import 'add_activity_screen.dart';
 
@@ -31,6 +32,62 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
     super.initState();
     _checkAdminStatus();
     _loadActivities();
+    _fetchActivities();
+  } // เพิ่มเมธอดดึงกิจกรรม
+
+  Future<void> _fetchActivities() async {
+    try {
+      final activities = await _activityService.fetchActivities();
+      setState(() {
+        // กรองเฉพาะกิจกรรมกลุ่ม
+        _activities = _filterGroupActivities(activities);
+      });
+    } catch (e) {
+      // จัดการข้อผิดพลาด
+      print('Error fetching activities: $e');
+      // อาจแสดง Snackbar หรือ Dialog เพื่อแจ้งผู้ใช้
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('ไม่สามารถโหลดกิจกรรมได้')),
+      );
+    }
+  }
+
+  void _navigateToAddGroupActivity() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddActivityScreen(
+          initialType: ActivityType.Group, // กำหนดเป็น Group โดยอัตโนมัติ
+        ),
+      ),
+    );
+
+    if (result is Activity) {
+      // บันทึกกิจกรรม
+      _saveActivity(result);
+    }
+  }
+
+  final ActivityService _activityService = ActivityService();
+
+  void _saveActivity(Activity activity) async {
+    try {
+      // บันทึกลง Firestore
+      await _activityService.addActivity(activity);
+
+      // รีเฟรชรายการกิจกรรม
+      _fetchActivities();
+    } catch (e) {
+      // จัดการข้อผิดพลาด
+      print('Error saving activity: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('ไม่สามารถบันทึกกิจกรรมได้')),
+      );
+    }
+  }
+
+  List<Activity> _filterGroupActivities(List<Activity> activities) {
+    return activities.where((activity) => activity.type == 'Group').toList();
   }
 
   Future<void> _checkAdminStatus() async {
@@ -57,6 +114,7 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
     try {
       setState(() => _isLoading = true);
 
+      // เจาะจงโหลดเฉพาะกิจกรรมของกลุ่มนี้
       final snapshot = await FirebaseFirestore.instance
           .collection('groups')
           .doc(widget.groupId)
@@ -102,45 +160,35 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
       MaterialPageRoute(
         builder: (context) => AddActivityScreen(
           groupId: widget.groupId,
+          initialType:
+              ActivityType.Group, // กำหนดเป็น Group Activity โดยอัตโนมัติ
         ),
       ),
     );
 
     if (result is Activity) {
-      try {
-        await FirebaseFirestore.instance
-            .collection('groups')
-            .doc(widget.groupId)
-            .collection('activities')
-            .add({
-          'title': result.title,
-          'description': result.description,
-          'date': result.date,
-          'startTimeHour': result.startTime.hour,
-          'startTimeMinute': result.startTime.minute,
-          'endTimeHour': result.endTime.hour,
-          'endTimeMinute': result.endTime.minute,
-          'type': result.type,
-          'status': result.status,
-          'createdAt': FieldValue.serverTimestamp(),
-          'createdBy': widget.currentUserEmail,
-        });
+      // บันทึก Group Activity
+      await _saveGroupActivity(result);
+    }
+  }
 
-        _loadActivities();
+  Future<void> _saveGroupActivity(Activity activity) async {
+    try {
+      // บันทึกใน collection ของกลุ่ม
+      await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('activities')
+          .add({
+        ...activity.toFirestoreMap(),
+        'groupId': widget.groupId,
+        'type': 'Group', // ระบุ type เป็น Group
+      });
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Activity created successfully')),
-          );
-        }
-      } catch (e) {
-        print('Error creating activity: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error creating activity')),
-          );
-        }
-      }
+      // Reload activities
+      _loadActivities();
+    } catch (e) {
+      print('Error saving group activity: $e');
     }
   }
 
@@ -448,6 +496,7 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
       children: [
         Column(
           children: [
+            // Calendar Section
             Container(
               margin: EdgeInsets.fromLTRB(16, 16, 16, 0),
               padding: EdgeInsets.all(16),
@@ -464,6 +513,7 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
               ),
               child: Column(
                 children: [
+                  // Calendar Header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -513,6 +563,7 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
                     ],
                   ),
 
+                  // Calendar
                   TableCalendar(
                     firstDay: DateTime.utc(2010, 1, 1),
                     lastDay: DateTime.utc(2030, 12, 31),
@@ -569,6 +620,7 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
                     },
                   ),
 
+                  // Activities count
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Row(
@@ -605,6 +657,7 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
               ),
             ),
 
+            // Activities List Section
             Expanded(
               child: _buildActivitiesList(),
             ),
