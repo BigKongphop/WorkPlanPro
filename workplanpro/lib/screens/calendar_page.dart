@@ -1617,28 +1617,101 @@ class _CalendarPageState extends State<CalendarPage> {
 
   Widget _buildActivityCard(Activity activity) {
     return Card(
-      margin: EdgeInsets.symmetric(vertical: 8),
-      elevation: 4, // เพิ่มเงาให้การ์ด
-      child: ListTile(
-        title: Text(
-          activity.title,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF0C5217),
+      margin: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.green.shade50, Colors.white],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.shade300,
+              blurRadius: 10,
+              offset: Offset(0, 5),
+            ),
+          ],
         ),
-        subtitle: Text(
-          DateFormat('dd MMM yyyy').format(activity.date),
-          style: TextStyle(color: Colors.grey),
+        child: Column(
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.all(16),
+              title: Text(
+                activity.title,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: Color(0xFF0C5217),
+                ),
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(height: 4),
+                  Text(
+                    activity.description,
+                    style: TextStyle(color: Colors.grey.shade700),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.access_time,
+                        size: 16,
+                        color: Colors.green.shade700,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        '${activity.startTime.format(context)} - ${activity.endTime.format(context)}',
+                        style: TextStyle(
+                          color: Colors.grey.shade700,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              trailing: Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _getStatusColor(activity.status).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  activity.status,
+                  style: TextStyle(
+                    color: _getStatusColor(activity.status),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              onTap: () => _showActivityDetails(activity),
+            ),
+            if (activity.groupName != null && activity.groupName!.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.only(bottom: 8, left: 16),
+                child: Row(
+                  children: [
+                    Icon(Icons.group, size: 16, color: Colors.grey),
+                    SizedBox(width: 4),
+                    Text(
+                      'From: ${activity.groupName}',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ),
-        trailing: Chip(
-          label: Text(
-            activity.status,
-            style: TextStyle(color: Colors.white, fontSize: 12),
-          ),
-          backgroundColor: _getStatusColor(activity.status),
-        ),
-        onTap: () => _showActivityDetailsModal(activity, 0, _activities),
       ),
     );
   }

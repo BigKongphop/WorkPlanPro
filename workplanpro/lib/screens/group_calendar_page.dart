@@ -57,6 +57,7 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
     try {
       setState(() => _isLoading = true);
 
+      // เจาะจงโหลดเฉพาะกิจกรรมของกลุ่มนี้
       final snapshot = await FirebaseFirestore.instance
           .collection('groups')
           .doc(widget.groupId)
@@ -64,40 +65,51 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
           .orderBy('date', descending: false)
           .get();
 
-      setState(() {
-        _activities = snapshot.docs.map((doc) {
-          final data = doc.data();
-          return Activity(
-            id: doc.id,
-            title: data['title'] ?? '',
-            description: data['description'] ?? '',
-            date: (data['date'] as Timestamp).toDate(),
-            startTime: TimeOfDay(
-              hour: data['startTimeHour'] ?? 0,
-              minute: data['startTimeMinute'] ?? 0,
-            ),
-            endTime: TimeOfDay(
-              hour: data['endTimeHour'] ?? 0,
-              minute: data['endTimeMinute'] ?? 0,
-            ),
-          );
-        }).toList();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _activities = snapshot.docs.map((doc) {
+            final data = doc.data();
+            return Activity(
+              id: doc.id,
+              title: data['title'] ?? '',
+              description: data['description'] ?? '',
+              date: (data['date'] as Timestamp).toDate(),
+              startTime: TimeOfDay(
+                hour: data['startTimeHour'] ?? 0,
+                minute: data['startTimeMinute'] ?? 0,
+              ),
+              endTime: TimeOfDay(
+                hour: data['endTimeHour'] ?? 0,
+                minute: data['endTimeMinute'] ?? 0,
+              ),
+              type: data['type'] ?? 'Personal',
+              status: data['status'] ?? 'Pending',
+            );
+          }).toList();
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      print('Error loading activities: $e');
-      setState(() => _isLoading = false);
+      print('Error loading group activities: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _createActivity() async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => AddActivityScreen()),
+      MaterialPageRoute(
+        builder: (context) => AddActivityScreen(
+          groupId: widget.groupId,
+        ),
+      ),
     );
 
     if (result is Activity) {
       try {
+        // เพิ่มกิจกรรมในคอลเลกชัน activities ของกลุ่มนั้นๆ
         await FirebaseFirestore.instance
             .collection('groups')
             .doc(widget.groupId)
@@ -110,11 +122,13 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
           'startTimeMinute': result.startTime.minute,
           'endTimeHour': result.endTime.hour,
           'endTimeMinute': result.endTime.minute,
+          'type': result.type,
+          'status': result.status,
           'createdAt': FieldValue.serverTimestamp(),
           'createdBy': widget.currentUserEmail,
         });
 
-        _loadActivities();
+        _loadActivities(); // โหลดข้อมูลใหม่
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -188,53 +202,37 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(15),
           ),
-          child: InkWell(
-            onTap: () => _showActivityDetail(activity),
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    activity.title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                      color: Color(0xFF0C5217),
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '${activity.startTime.format(context)} - ${activity.endTime.format(context)}',
-                        style: TextStyle(
-                          color: Colors.grey.shade700,
-                          fontSize: 13,
-                        ),
-                      ),
-                      Container(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          activity.status,
-                          style: TextStyle(
-                            color: Colors.orange,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+          child: ListTile(
+            contentPadding: EdgeInsets.all(16),
+            title: Text(
+              activity.title,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+                color: Color(0xFF0C5217),
               ),
             ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: 4),
+                Text(
+                  activity.description,
+                  style: TextStyle(color: Colors.grey.shade700),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: 8),
+                Text(
+                  '${activity.startTime.format(context)} - ${activity.endTime.format(context)}',
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+            onTap: () => _showActivityDetail(activity),
           ),
         );
       },
@@ -377,7 +375,9 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddActivityScreen(activityToEdit: activity),
+        builder: (context) => AddActivityScreen(
+          groupId: widget.groupId,
+        ),
       ),
     );
 

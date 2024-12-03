@@ -8,6 +8,9 @@ enum SortType { nearestDate, newest, oldest }
 class Activity {
   final String? id;
   final String title;
+  final String? groupId;
+  final String? groupName;
+  final bool isGroupActivity;
   String description;
   DateTime date;
   TimeOfDay startTime;
@@ -27,6 +30,9 @@ class Activity {
     this.type = 'Personal',
     this.status = 'Pending',
     this.priority = 'Low',
+    this.groupId,
+    this.groupName,
+    this.isGroupActivity = false,
     String? userId,
   }) : userId = userId ?? FirebaseAuth.instance.currentUser?.uid;
 

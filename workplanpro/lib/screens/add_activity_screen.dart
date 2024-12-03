@@ -1,9 +1,9 @@
-//add_activity_screen.dart
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/activity.dart';
 import '../screens/activity_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ActivityModel {
   final String id;
@@ -38,9 +38,14 @@ class ActivityModel {
 class AddActivityScreen extends StatefulWidget {
   final Activity? activityToEdit;
   final Function(Activity)? onActivitySaved;
+  final String? groupId;
 
-  const AddActivityScreen({Key? key, this.activityToEdit, this.onActivitySaved})
-      : super(key: key);
+  const AddActivityScreen({
+    Key? key,
+    this.activityToEdit,
+    this.onActivitySaved,
+    this.groupId,
+  }) : super(key: key);
 
   @override
   _AddActivityScreenState createState() => _AddActivityScreenState();
@@ -760,23 +765,48 @@ class _AddActivityScreenState extends State<AddActivityScreen>
     );
   }
 
-  void _saveActivity() async {
+  Future<void> _saveActivity() async {
     if (!_validateInputs()) return;
 
-    final activity = _prepareActivityData();
-    final activityService = ActivityService();
-
     try {
-      final savedActivity = await _performActivityOperation(
-          activityService, activity, widget.activityToEdit != null);
+      final activity = _prepareActivityData();
 
-      // เรียก callback หากมี
-      widget.onActivitySaved?.call(savedActivity);
+      if (widget.groupId != null) {
+        // เพิ่ม groupName เข้าไปในข้อมูลกิจกรรม
+        final groupDoc = await FirebaseFirestore.instance
+            .collection('groups')
+            .doc(widget.groupId)
+            .get();
 
-      _handleSuccessfulSave(
-          widget.activityToEdit == null ? 'create' : 'update', savedActivity);
+        final groupData = groupDoc.data();
+        final groupName = groupData?['name'] ?? '';
+
+        final activityData = {
+          ...activity.toFirestoreMap(),
+          'groupId': widget.groupId,
+          'groupName': groupName,
+          'isGroupActivity': true
+        };
+
+        // บันทึกทั้งในกลุ่มและ activities หลัก
+        await FirebaseFirestore.instance
+            .collection('groups')
+            .doc(widget.groupId)
+            .collection('activities')
+            .add(activityData);
+
+        await FirebaseFirestore.instance
+            .collection('activities')
+            .add(activityData);
+      } else {
+        await FirebaseFirestore.instance
+            .collection('activities')
+            .add(activity.toFirestoreMap());
+      }
+
+      Navigator.pop(context, activity);
     } catch (e) {
-      _showErrorSnackBar('Error: ${e.toString()}');
+      _showErrorSnackBar('Error saving activity: $e');
     }
   }
 
