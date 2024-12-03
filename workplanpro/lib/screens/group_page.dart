@@ -86,99 +86,175 @@ class _GroupPageState extends State<GroupPage> {
     final data = group.data() as Map<String, dynamic>;
     final bool isCreator = data['creatorEmail'] == widget.userEmail;
 
-    print('Group image URL: ${data['imageUrl']}');
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: SizedBox(
+    return Dismissible(
+      key: Key(group.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
         height: 85,
-        child: ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(25),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(25),
-              child: data['imageUrl'] != null &&
-                      data['imageUrl'].toString().isNotEmpty
-                  ? (data['imageUrl'].toString().startsWith('assets/')
-                      ? Image.asset(
-                          data['imageUrl'],
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            print('Error loading asset image: $error');
-                            return Icon(Icons.group, color: Colors.grey[400]);
-                          },
-                        )
-                      : CachedNetworkImage(
-                          imageUrl: data['imageUrl'],
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Color(0xFF0C5217),
-                            ),
-                          ),
-                          errorWidget: (context, url, error) {
-                            print('Error loading network image: $error');
-                            return Icon(Icons.group, color: Colors.grey[400]);
-                          },
-                        ))
-                  : Icon(Icons.group, color: Colors.grey[400]),
-            ),
-          ),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isCreator ? Colors.red : Colors.orange,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 16),
+        child: Icon(isCreator ? Icons.delete : Icons.exit_to_app,
+            color: Colors.white, size: 20),
+      ),
+      confirmDismiss: (direction) => showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
           title: Text(
-            data['name']?.toString().replaceAll(RegExp(r'\s*\(\d+\)'), '') ??
-                'Unnamed Group',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
+              isCreator ? 'Confirm Group Deletion' : 'Confirm Leave Group'),
+          content: Text(isCreator
+              ? 'Are you sure you want to delete this group?'
+              : 'Are you sure you want to leave this group?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
             ),
-          ),
-          subtitle: Row(
-            children: [
-              Icon(Icons.people, size: 14, color: Colors.grey[600]),
-              const SizedBox(width: 4),
-              Text(
-                '${data['memberCount']?.toString() ?? '0'} members',
-                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(
+                isCreator ? 'Delete' : 'Leave',
+                style: TextStyle(color: isCreator ? Colors.red : Colors.orange),
               ),
-              if (isCreator) ...[
-                const SizedBox(width: 8),
-                Icon(Icons.star, size: 14, color: Colors.amber),
+            ),
+          ],
+        ),
+      ),
+      onDismissed: (direction) async {
+        try {
+          if (isCreator) {
+            // Delete the group
+            await FirebaseFirestore.instance
+                .collection('groups')
+                .doc(group.id)
+                .delete();
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Group deleted successfully')),
+            );
+          } else {
+            // Leave the group
+            final List<String> memberEmails =
+                List<String>.from(data['memberEmails'] ?? []);
+            memberEmails.remove(widget.userEmail);
+
+            await FirebaseFirestore.instance
+                .collection('groups')
+                .doc(group.id)
+                .update({
+              'memberEmails': memberEmails,
+              'memberCount': FieldValue.increment(-1)
+            });
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Left group successfully')),
+            );
+          }
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  isCreator ? 'Error deleting group' : 'Error leaving group'),
+            ),
+          );
+        }
+      },
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: SizedBox(
+          height: 85,
+          child: ListTile(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(25),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(25),
+                child: data['imageUrl'] != null &&
+                        data['imageUrl'].toString().isNotEmpty
+                    ? (data['imageUrl'].toString().startsWith('assets/')
+                        ? Image.asset(
+                            data['imageUrl'],
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              print('Error loading asset image: $error');
+                              return Icon(Icons.group, color: Colors.grey[400]);
+                            },
+                          )
+                        : CachedNetworkImage(
+                            imageUrl: data['imageUrl'],
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFF0C5217),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) {
+                              print('Error loading network image: $error');
+                              return Icon(Icons.group, color: Colors.grey[400]);
+                            },
+                          ))
+                    : Icon(Icons.group, color: Colors.grey[400]),
+              ),
+            ),
+            title: Text(
+              data['name']?.toString().replaceAll(RegExp(r'\s*\(\d+\)'), '') ??
+                  'Unnamed Group',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            subtitle: Row(
+              children: [
+                Icon(Icons.people, size: 14, color: Colors.grey[600]),
                 const SizedBox(width: 4),
                 Text(
-                  'Creator',
-                  style: TextStyle(
-                    color: Colors.amber[700],
-                    fontWeight: FontWeight.w500,
-                    fontSize: 12,
+                  '${data['memberCount']?.toString() ?? '0'} members',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
+                if (isCreator) ...[
+                  const SizedBox(width: 8),
+                  Icon(Icons.star, size: 14, color: Colors.amber),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Creator',
+                    style: TextStyle(
+                      color: Colors.amber[700],
+                      fontWeight: FontWeight.w500,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => GroupDetailScreen(
+                    groupId: group.id,
+                    username: widget.username,
+                    userEmail: widget.userEmail,
                   ),
                 ),
-              ],
-            ],
+              );
+            },
           ),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => GroupDetailScreen(
-                  groupId: group.id,
-                  username: widget.username,
-                  userEmail: widget.userEmail,
-                ),
-              ),
-            );
-          },
         ),
       ),
     );
