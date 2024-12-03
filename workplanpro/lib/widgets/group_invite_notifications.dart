@@ -59,10 +59,8 @@ class _NotificationWidgetState extends State<NotificationWidget> {
     if (!mounted) return;
 
     try {
-      // ปิด bottom sheet ก่อน
       Navigator.pop(context);
 
-      // เริ่ม batch operation
       WriteBatch batch = FirebaseFirestore.instance.batch();
 
       final groupRef =
@@ -70,52 +68,47 @@ class _NotificationWidgetState extends State<NotificationWidget> {
       final memberRef = groupRef.collection('members').doc(memberId);
 
       if (accept) {
-        // อัพเดทสถานะสมาชิก
         batch.update(memberRef, {
           'status': 'accepted',
           'joinedAt': FieldValue.serverTimestamp(),
           'role': 'member'
         });
 
-        // อัพเดทข้อมูลกลุ่ม
         batch.update(groupRef, {
           'memberCount': FieldValue.increment(1),
           'memberEmails': FieldValue.arrayUnion([widget.userEmail])
         });
 
-        // ดำเนินการ batch
         await batch.commit();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('เข้าร่วมกลุ่มเรียบร้อยแล้ว'),
+              content: Text('Successfully joined the group'),
               behavior: SnackBarBehavior.floating,
             ),
           );
         }
       } else {
-        // กรณีปฏิเสธคำเชิญ
         await memberRef.delete();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('ปฏิเสธคำเชิญแล้ว'),
+              content: Text('Invitation declined'),
               behavior: SnackBarBehavior.floating,
             ),
           );
         }
       }
 
-      // โหลดข้อมูลใหม่
       await _loadInvitations();
     } catch (e) {
       print('Error handling invitation: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('เกิดข้อผิดพลาด: $e'),
+            content: Text('Error: $e'),
             behavior: SnackBarBehavior.floating,
             backgroundColor: Colors.red,
           ),
@@ -183,7 +176,7 @@ class _NotificationWidgetState extends State<NotificationWidget> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  'คำเชิญเข้าร่วมกลุ่ม',
+                                  'Group Invitations',
                                   style: Theme.of(context)
                                       .textTheme
                                       .titleLarge
@@ -201,118 +194,120 @@ class _NotificationWidgetState extends State<NotificationWidget> {
                             const Divider(),
                             const SizedBox(height: 8),
                             Flexible(
-                                child: ListView.builder(
-                              shrinkWrap: true,
-                              itemCount: groupsData.length,
-                              itemBuilder: (context, index) {
-                                final data = groupsData[index];
-                                final groupDoc =
-                                    data['group'] as DocumentSnapshot;
-                                final invitation =
-                                    data['invitation'] as QueryDocumentSnapshot;
-                                final groupData =
-                                    groupDoc.data() as Map<String, dynamic>;
+                              child: ListView.builder(
+                                shrinkWrap: true,
+                                itemCount: groupsData.length,
+                                itemBuilder: (context, index) {
+                                  final data = groupsData[index];
+                                  final groupDoc =
+                                      data['group'] as DocumentSnapshot;
+                                  final invitation =
+                                      data['invitation'] as QueryDocumentSnapshot;
+                                  final groupData =
+                                      groupDoc.data() as Map<String, dynamic>;
 
-                                return Card(
-                                  margin: const EdgeInsets.all(8),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(15),
-                                  ),
-                                  child: ListTile(
-                                    contentPadding: const EdgeInsets.all(8),
-                                    leading: FutureBuilder(
-                                      future: FirebaseFirestore.instance
-                                          .collection('groups')
-                                          .doc(groupDoc.id)
-                                          .get(),
-                                      builder: (context, snapshot) {
-                                        if (snapshot.hasData &&
-                                            snapshot.data != null) {
-                                          final Map<String, dynamic>?
-                                              groupData = snapshot.data!.data()
-                                                  as Map<String, dynamic>?;
-                                          final String? imageUrl =
-                                              groupData?['imageUrl'];
+                                  return Card(
+                                    margin: const EdgeInsets.all(8),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                    child: ListTile(
+                                      contentPadding: const EdgeInsets.all(8),
+                                      leading: FutureBuilder(
+                                        future: FirebaseFirestore.instance
+                                            .collection('groups')
+                                            .doc(groupDoc.id)
+                                            .get(),
+                                        builder: (context, snapshot) {
+                                          if (snapshot.hasData &&
+                                              snapshot.data != null) {
+                                            final Map<String, dynamic>?
+                                                groupData = snapshot.data!.data()
+                                                    as Map<String, dynamic>?;
+                                            final String? imageUrl =
+                                                groupData?['imageUrl'];
 
-                                          return CircleAvatar(
+                                            return CircleAvatar(
+                                              radius: 25,
+                                              backgroundColor:
+                                                  const Color(0xFF0C5217),
+                                              backgroundImage: imageUrl != null &&
+                                                      imageUrl.isNotEmpty
+                                                  ? (imageUrl
+                                                          .startsWith('assets/')
+                                                      ? AssetImage(imageUrl)
+                                                          as ImageProvider
+                                                      : CachedNetworkImageProvider(
+                                                          imageUrl))
+                                                  : null,
+                                              child: imageUrl == null ||
+                                                      imageUrl.isEmpty
+                                                  ? const Icon(Icons.group,
+                                                      color: Colors.white)
+                                                  : null,
+                                            );
+                                          }
+                                          return const CircleAvatar(
                                             radius: 25,
                                             backgroundColor: Color(0xFF0C5217),
-                                            backgroundImage: imageUrl != null &&
-                                                    imageUrl.isNotEmpty
-                                                ? (imageUrl
-                                                        .startsWith('assets/')
-                                                    ? AssetImage(imageUrl)
-                                                        as ImageProvider
-                                                    : CachedNetworkImageProvider(
-                                                        imageUrl))
-                                                : null,
-                                            child: imageUrl == null ||
-                                                    imageUrl.isEmpty
-                                                ? Icon(Icons.group,
-                                                    color: Colors.white)
-                                                : null,
+                                            child: Icon(Icons.group,
+                                                color: Colors.white),
                                           );
-                                        }
-                                        return CircleAvatar(
-                                          radius: 25,
-                                          backgroundColor: Color(0xFF0C5217),
-                                          child: Icon(Icons.group,
-                                              color: Colors.white),
-                                        );
-                                      },
-                                    ),
-                                    title: Text(
-                                      groupData['name']?.toString() ??
-                                          'Unknown Group',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
+                                        },
+                                      ),
+                                      title: Text(
+                                        groupData['name']?.toString() ??
+                                            'Unknown Group',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                          'From: ${groupData['creatorName'] ?? 'Unknown'}'),
+                                      trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          TextButton(
+                                            style: TextButton.styleFrom(
+                                              backgroundColor:
+                                                  Colors.green.withOpacity(0.1),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
+                                              ),
+                                            ),
+                                            onPressed: () => _handleInvitation(
+                                                groupDoc.id, invitation.id, true),
+                                            child: const Text('Accept',
+                                                style: TextStyle(
+                                                    color: Colors.green)),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          TextButton(
+                                            style: TextButton.styleFrom(
+                                              backgroundColor:
+                                                  Colors.red.withOpacity(0.1),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
+                                              ),
+                                            ),
+                                            onPressed: () => _handleInvitation(
+                                                groupDoc.id,
+                                                invitation.id,
+                                                false),
+                                            child: const Text('Decline',
+                                                style:
+                                                    TextStyle(color: Colors.red)),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    subtitle: Text(
-                                        'From: ${groupData['creatorName'] ?? 'Unknown'}'),
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        TextButton(
-                                          style: TextButton.styleFrom(
-                                            backgroundColor:
-                                                Colors.green.withOpacity(0.1),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(20),
-                                            ),
-                                          ),
-                                          onPressed: () => _handleInvitation(
-                                              groupDoc.id, invitation.id, true),
-                                          child: const Text('รับ',
-                                              style: TextStyle(
-                                                  color: Colors.green)),
-                                        ),
-                                        SizedBox(width: 8),
-                                        TextButton(
-                                          style: TextButton.styleFrom(
-                                            backgroundColor:
-                                                Colors.red.withOpacity(0.1),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(20),
-                                            ),
-                                          ),
-                                          onPressed: () => _handleInvitation(
-                                              groupDoc.id,
-                                              invitation.id,
-                                              false),
-                                          child: const Text('ปฏิเสธ',
-                                              style:
-                                                  TextStyle(color: Colors.red)),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            )),
+                                  );
+                                },
+                              ),
+                            ),
                           ],
                         ),
                       ),
