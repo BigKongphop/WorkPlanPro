@@ -17,6 +17,43 @@ import 'package:workplanpro/screens/login_page.dart';
 import 'package:http/http.dart' as http;
 import 'choose_profileimage_screen.dart';
 
+final ThemeData globalTheme = ThemeData(
+  colorScheme: ColorScheme.fromSeed(
+    seedColor: Color(0xFF1A5F7A),
+    primary: Color(0xFF1A5F7A),
+    secondary: Color(0xFF159895),
+    background: Color(0xFFF8F9FA),
+    surface: Colors.white,
+  ),
+  typography: Typography.material2021(),
+  textTheme: TextTheme(
+    headlineLarge: TextStyle(
+      fontSize: 28,
+      fontWeight: FontWeight.w700,
+      color: Color(0xFF1A5F7A),
+    ),
+    bodyLarge: TextStyle(
+      fontSize: 16,
+      color: Colors.black87,
+    ),
+  ),
+  inputDecorationTheme: InputDecorationTheme(
+    filled: true,
+    fillColor: Colors.white,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(15),
+      borderSide: BorderSide.none,
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(15),
+      borderSide: BorderSide(
+        color: Color(0xFF1A5F7A),
+        width: 2,
+      ),
+    ),
+  ),
+);
+
 class FirebaseService {
   static Future<Map<String, dynamic>> fetchUserData() async {
     try {
@@ -1093,6 +1130,128 @@ class _EditProfilePageState extends State<EditProfilePage>
               )
             : _buildDefaultAvatar(),
       ),
+    );
+  }
+
+  Widget _buildProfileHeader() {
+    return AnimatedContainer(
+      duration: Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color(0xFF1A5F7A),
+            Color(0xFF159895),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(30),
+          bottomRight: Radius.circular(30),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 15,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+      child: Column(
+        children: [
+          Hero(
+            tag: 'profile_image',
+            child: GestureDetector(
+              onTap: _selectProfileImage,
+              child: CircleAvatar(
+                radius: 80,
+                backgroundColor: Colors.white.withOpacity(0.2),
+                child: Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 75,
+                      backgroundImage: _profileImageUrl != null
+                          ? NetworkImage(_profileImageUrl!)
+                          : AssetImage('assets/default_profile.png')
+                              as ImageProvider,
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Color(0xFF1A5F7A),
+                          shape: BoxShape.circle,
+                        ),
+                        padding: EdgeInsets.all(8),
+                        child: Icon(
+                          Icons.camera_alt,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          SizedBox(height: 20),
+          Text(
+            _usernameController.text,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            _emailController.text,
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 16,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileStats() {
+    return Container(
+      margin: EdgeInsets.symmetric(vertical: 20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _buildStatItem('Posts', '45'),
+          _buildStatItem('Followers', '1.2K'),
+          _buildStatItem('Following', '500'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String label, String value) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1A5F7A),
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey,
+          ),
+        ),
+      ],
     );
   }
 
