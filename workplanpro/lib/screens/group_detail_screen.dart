@@ -53,11 +53,15 @@ class GroupDetailScreen extends StatefulWidget {
 
 class _GroupDetailScreenState extends State<GroupDetailScreen> {
   final TextEditingController _messageController = TextEditingController();
+  final ImagePicker _imagePicker = ImagePicker();
+
   bool isLoading = true;
   bool _isUploading = false;
   bool _isAdmin = false;
-  final ImagePicker _imagePicker = ImagePicker();
+
   Map<String, dynamic>? groupData;
+  String? _editingMessageId;
+
   List<Map<String, dynamic>> messages = [];
   int _selectedTabIndex = 0;
 
@@ -86,6 +90,33 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       print('Error loading group data: $e');
       if (mounted) {
         setState(() => isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _updateMessage(String messageId, String newContent) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('messages')
+          .doc(messageId)
+          .update({
+        'content': newContent,
+        'isEdited': true,
+      });
+
+      setState(() {
+        _editingMessageId = null;
+        _messageController.clear();
+      });
+
+      await _loadMessages();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating message: $e')),
+        );
       }
     }
   }
@@ -177,18 +208,25 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     if (_messageController.text.trim().isEmpty) return;
 
     try {
-      await FirebaseFirestore.instance
-          .collection('groups')
-          .doc(widget.groupId)
-          .collection('messages')
-          .add({
-        'content': _messageController.text.trim(),
-        'sender': widget.username,
-        'senderEmail': widget.userEmail,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      if (_editingMessageId != null) {
+        await _updateMessage(
+            _editingMessageId!, _messageController.text.trim());
+      } else {
+        await FirebaseFirestore.instance
+            .collection('groups')
+            .doc(widget.groupId)
+            .collection('messages')
+            .add({
+          'content': _messageController.text.trim(),
+          'sender': widget.username,
+          'senderEmail': widget.userEmail,
+          'createdAt': FieldValue.serverTimestamp(),
+          'isEdited': false,
+        });
+      }
 
       _messageController.clear();
+      await _loadMessages();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -196,6 +234,20 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         );
       }
     }
+  }
+
+  void _startEditing(Map<String, dynamic> message) {
+    setState(() {
+      _editingMessageId = message['id'];
+      _messageController.text = message['content'];
+    });
+  }
+
+  void _cancelEditing() {
+    setState(() {
+      _editingMessageId = null;
+      _messageController.clear();
+    });
   }
 
   Widget _buildChatView() {
@@ -487,39 +539,69 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     );
   }
 
-  // แทนที่ส่วน build ของ Row ที่มีปุ่มส่งข้อความ
+
   Widget _buildMessageInput() {
     return Padding(
       padding: const EdgeInsets.all(8.0),
-      child: Row(
+      child: Column(
         children: [
-          IconButton(
-            icon: Icon(Icons.attach_file),
-            onPressed: _showAttachmentOptions,
-          ),
-          Expanded(
-            child: TextField(
-              controller: _messageController,
-              decoration: InputDecoration(
-                hintText: 'Type a message',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(25),
-                ),
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          if (_editingMessageId != null)
+            Container(
+              padding: EdgeInsets.all(8),
+              color: Colors.grey[200],
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Editing message',
+                      style: TextStyle(
+                        fontStyle: FontStyle.italic,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close),
+                    onPressed: _cancelEditing,
+                  ),
+                ],
               ),
             ),
-          ),
-          SizedBox(width: 8),
-          _isUploading
-              ? CircularProgressIndicator()
-              : CircleAvatar(
-                  backgroundColor: Color(0xFF0C5217),
-                  child: IconButton(
-                    icon: Icon(Icons.send, color: Colors.white),
-                    onPressed: _sendMessage,
+          Row(
+            children: [
+              IconButton(
+                icon: Icon(Icons.attach_file),
+                onPressed:
+                    _editingMessageId == null ? _showAttachmentOptions : null,
+              ),
+              Expanded(
+                child: TextField(
+                  controller: _messageController,
+                  decoration: InputDecoration(
+                    hintText: 'Type a message',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   ),
                 ),
+              ),
+              SizedBox(width: 8),
+              _isUploading
+                  ? CircularProgressIndicator()
+                  : CircleAvatar(
+                      backgroundColor: Color(0xFF0C5217),
+                      child: IconButton(
+                        icon: Icon(
+                          _editingMessageId != null ? Icons.check : Icons.send,
+                          color: Colors.white,
+                        ),
+                        onPressed: _sendMessage,
+                      ),
+                    ),
+            ],
+          ),
         ],
       ),
     );
@@ -576,52 +658,90 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       Map<String, dynamic> message, bool isMyMessage, DateTime date) {
     return Align(
       alignment: isMyMessage ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: EdgeInsets.only(
-          bottom: 8,
-          left: isMyMessage ? 50 : 0,
-          right: isMyMessage ? 0 : 50,
-        ),
-        padding: EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isMyMessage ? Color(0xFF0C5217) : Colors.grey[200],
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (!isMyMessage)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  message['sender'],
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    color: Colors.grey[600],
+      child: GestureDetector(
+        onLongPress: isMyMessage ? () => _showMessageOptions(message) : null,
+        child: Container(
+          margin: EdgeInsets.only(
+            bottom: 8,
+            left: isMyMessage ? 50 : 0,
+            right: isMyMessage ? 0 : 50,
+          ),
+          padding: EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isMyMessage ? Color(0xFF0C5217) : Colors.grey[200],
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (!isMyMessage)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    message['sender'],
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
                   ),
                 ),
+              if (message['mediaUrl'] != null) ...[
+                _buildMediaPreview(message),
+                SizedBox(height: 8),
+              ],
+              if (message['content'].isNotEmpty)
+                Text(
+                  message['content'],
+                  style: TextStyle(
+                    color: isMyMessage ? Colors.white : Colors.black,
+                  ),
+                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    DateFormat('HH:mm').format(date),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isMyMessage ? Colors.white70 : Colors.grey[600],
+                    ),
+                  ),
+                  if (message['isEdited'] == true) ...[
+                    SizedBox(width: 4),
+                    Text(
+                      '(edited)',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontStyle: FontStyle.italic,
+                        color: isMyMessage ? Colors.white70 : Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ],
               ),
-            if (message['mediaUrl'] != null) ...[
-              _buildMediaPreview(message),
-              SizedBox(height: 8),
             ],
-            if (message['content'].isNotEmpty)
-              Text(
-                message['content'],
-                style: TextStyle(
-                  color: isMyMessage ? Colors.white : Colors.black,
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                DateFormat('HH:mm').format(date),
-                style: TextStyle(
-                  fontSize: 10,
-                  color: isMyMessage ? Colors.white70 : Colors.grey[600],
-                ),
-              ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showMessageOptions(Map<String, dynamic> message) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.edit),
+              title: Text('Edit Message'),
+              onTap: () {
+                Navigator.pop(context);
+                _startEditing(message);
+              },
             ),
           ],
         ),
