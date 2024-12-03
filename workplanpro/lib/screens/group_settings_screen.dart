@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import './choose_group_image_screen.dart';
 
@@ -139,8 +138,13 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   }
 
   Future<void> _editGroupInfo() async {
-    if (_nameController.text.trim().isEmpty) {
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
       _showErrorSnackBar('Group name cannot be empty');
+      return;
+    }
+    if (name.length > 25) {
+      _showErrorSnackBar('Group name cannot exceed 25 characters');
       return;
     }
 
@@ -278,8 +282,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
         title: Text('Group Settings', style: TextStyle(color: Colors.white)),
         backgroundColor: Color(0xFF0C5217),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back,
-              color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -292,16 +295,22 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                 // Group Image Section
                 Container(
                   height: 200,
+                  width: double.infinity,
                   decoration: BoxDecoration(
                     color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(30),
+                    // Add a subtle border if needed
+                    border: Border.all(
+                      color: Colors.grey[300]!,
+                      width: 1,
+                    ),
                   ),
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
                       if (currentGroupImage != null) ...[
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(30),
                           child: currentGroupImage!.startsWith('assets/')
                               ? Image.asset(
                                   currentGroupImage!,
@@ -311,10 +320,15 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                                   imageUrl: currentGroupImage!,
                                   fit: BoxFit.cover,
                                   placeholder: (context, url) => Center(
-                                    child: CircularProgressIndicator(),
+                                    child: CircularProgressIndicator(
+                                      color: Color(0xFF0C5217),
+                                    ),
                                   ),
-                                  errorWidget: (context, url, error) =>
-                                      Icon(Icons.error),
+                                  errorWidget: (context, url, error) => Icon(
+                                    Icons.group,
+                                    size: 64,
+                                    color: Colors.grey[400],
+                                  ),
                                 ),
                         ),
                       ] else
@@ -326,10 +340,23 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                       Positioned(
                         bottom: 8,
                         right: 8,
-                        child: FloatingActionButton.small(
-                          onPressed: _changeGroupImage,
-                          backgroundColor: Color(0xFF0C5217),
-                          child: Icon(Icons.camera_alt, color: Colors.white),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Color(0xFF0C5217),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 8,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: IconButton(
+                            icon: Icon(Icons.photo_library,
+                                color: Colors.white, size: 20),
+                            onPressed: _changeGroupImage,
+                          ),
                         ),
                       ),
                     ],
@@ -348,9 +375,11 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                 SizedBox(height: 16),
                 TextField(
                   controller: _nameController,
+                  maxLength: 25,
                   decoration: InputDecoration(
                     labelText: 'Group Name',
                     border: OutlineInputBorder(),
+                    counterText: '',
                   ),
                 ),
                 SizedBox(height: 16),

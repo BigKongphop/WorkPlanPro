@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import './choose_group_image_screen.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   final String currentUsername;
@@ -21,6 +22,21 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   final _descriptionController = TextEditingController();
   bool _isLoading = false;
   String? _nameError;
+  String _selectedImage = 'assets/group_images/default1.png';
+
+  void _showImagePicker() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChooseGroupImageScreen(
+          currentImage: _selectedImage,
+          onImageSelected: (imagePath) {
+            setState(() => _selectedImage = imagePath);
+          },
+        ),
+      ),
+    );
+  }
 
   Future<void> _createGroup() async {
     if (!_formKey.currentState!.validate()) return;
@@ -33,7 +49,6 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     try {
       final firestore = FirebaseFirestore.instance;
 
-      // ดึงลำดับสูงสุดที่มีอยู่
       final highestOrderDoc = await firestore
           .collection('groups')
           .orderBy('order', descending: true)
@@ -44,7 +59,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       if (highestOrderDoc.docs.isNotEmpty) {
         nextOrder = (highestOrderDoc.docs.first.data()['order'] ?? -1) + 1;
       }
-      
+
       final groupSnapshot = await firestore
           .collection('groups')
           .where('name', isEqualTo: _nameController.text)
@@ -65,12 +80,12 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         'createdAt': FieldValue.serverTimestamp(),
         'memberCount': 1,
         'memberEmails': [widget.currentEmail],
-        'order': nextOrder, // เพิ่ม order field
+        'order': nextOrder,
+        'imageUrl': _selectedImage,
       });
 
       await docRef.update({'id': docRef.id});
 
-      // Add creator as admin member
       final memberRef = docRef.collection('members').doc();
       await memberRef.set({
         'email': widget.currentEmail,
@@ -84,14 +99,13 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         SnackBar(content: Text('Group created successfully')),
       );
     } catch (e) {
-      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error creating group: $e')),
       );
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
-
-  
 
   @override
   Widget build(BuildContext context) {
@@ -99,10 +113,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: const Color(0xFF0C5217),
-        title: const Text(
-          'Create New Group',
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text('Create New Group',
+            style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -116,6 +128,47 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Center(
+                  child: Container(
+                    height: 200,
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          height: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(30),
+                            child: _selectedImage != null
+                                ? Image.asset(_selectedImage!,
+                                    fit: BoxFit.cover)
+                                : Icon(Icons.group,
+                                    size: 64, color: Colors.grey[400]),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 16,
+                          right: 16,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Color(0xFF0C5217),
+                              shape: BoxShape.circle,
+                            ),
+                            child: IconButton(
+                              icon: Icon(Icons.photo_library,
+                                  color: Colors.white),
+                              onPressed: _showImagePicker,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(height: 24),
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
@@ -129,6 +182,9 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                   validator: (value) {
                     if (value?.trim().isEmpty ?? true) {
                       return 'Please enter a group name';
+                    }
+                    if ((value?.length ?? 0) > 25) {
+                      return 'Group name cannot exceed 25 characters';
                     }
                     return null;
                   },
@@ -169,10 +225,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                           )
                         : Text(
                             'Create Group',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.white,
-                            ),
+                            style: TextStyle(fontSize: 16, color: Colors.white),
                           ),
                   ),
                 ),
