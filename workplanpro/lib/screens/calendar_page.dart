@@ -1,6 +1,10 @@
+//calendar_page.dart
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:motion_tab_bar_v2/motion-tab-bar.dart';
 import 'package:intl/intl.dart';
+import 'package:workplanpro/screens/activity_service.dart';
 import 'note_page.dart';
 import 'account_page.dart';
 import 'group_page.dart';
@@ -8,6 +12,96 @@ import 'home_page.dart';
 import 'add_activity_screen.dart';
 import '../models/activity.dart';
 import '../services/activity_database.dart';
+import 'package:table_calendar/table_calendar.dart';
+
+class Calendar extends StatelessWidget {
+  DateTime _currentMonth = DateTime.now();
+  List<Activity> _activities = [];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Calendar'),
+      ),
+      body: Container(
+        padding: EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'December 2024',
+              style: TextStyle(
+                fontSize: 24.0,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 16.0),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildDayHeader('Sun'),
+                _buildDayHeader('Mon'),
+                _buildDayHeader('Tue'),
+                _buildDayHeader('Wed'),
+                _buildDayHeader('Thu'),
+                _buildDayHeader('Fri'),
+                _buildDayHeader('Sat'),
+              ],
+            ),
+            SizedBox(height: 8.0),
+            Expanded(
+              child: GridView.builder(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 7,
+                  childAspectRatio: 1.0,
+                  mainAxisSpacing: 8.0,
+                  crossAxisSpacing: 8.0,
+                ),
+                itemCount: 35,
+                itemBuilder: (context, index) {
+                  int day = index + 1;
+                  bool isToday = day == 2; // Assuming today is the 2nd
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: isToday ? Colors.green : Colors.transparent,
+                      border: Border.all(
+                        color: isToday ? Colors.green : Colors.grey.shade400,
+                        width: isToday ? 2.0 : 1.0,
+                      ),
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                    child: Center(
+                      child: Text(
+                        day.toString(),
+                        style: TextStyle(
+                          color: isToday ? Colors.white : Colors.grey.shade700,
+                          fontWeight:
+                              isToday ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDayHeader(String day) {
+    return Text(
+      day,
+      style: TextStyle(
+        fontSize: 16.0,
+        fontWeight: FontWeight.bold,
+        color: Colors.grey.shade700,
+      ),
+    );
+  }
+}
 
 // CalendarPage
 class CalendarPage extends StatefulWidget {
@@ -27,469 +121,1699 @@ class CalendarPage extends StatefulWidget {
 
 class _CalendarPageState extends State<CalendarPage> {
   final ActivityDatabase _activityDatabase = ActivityDatabase();
+  final ActivityService _activityService = ActivityService();
+  List<Activity> _activities = [];
+  SortType _currentSortType = SortType.nearestDate;
   int _currentIndex = 3;
   DateTime _currentMonth = DateTime.now();
-  List<Activity> _activities = [];
   List<Activity> _groupActivities = [];
   bool _isCalendarExpanded = true;
   bool _isPersonalActivitiesExpanded = true;
   bool _isGroupActivitiesExpanded = true;
   bool _isLoading = true;
+  List<Activity> _filteredActivities = []; // เพิ่มบรรทัดนี้
+  String _selectedCategory = 'All'; // เพิ่มบรรทัดนี้
+  final GlobalKey<AnimatedListState> _listKey = GlobalKey<AnimatedListState>();
+  CalendarFormat _calendarFormat = CalendarFormat.month;
+
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay;
 
   @override
   void initState() {
     super.initState();
-    _loadActivities();
+    _loadActivities().then((_) {
+      setState(() {
+        _selectedCategory = 'All'; // ตั้งค่าเริ่มต้นเป็น All
+        _filteredActivities = _filterActivities(); // กรองกิจกรรมทันที
+      });
+    }).catchError((error) {
+      setState(() {
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('เกิดข้อผิดพลาดในการโหลดกิจกรรม: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    });
   }
 
   Future<void> _loadActivities() async {
     try {
       setState(() => _isLoading = true);
-      final activities =
-          await _activityDatabase.loadActivities(widget.username);
-      setState(() {
-        _activities = activities;
-        _sortActivities();
-        _isLoading = false;
-      });
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final activities =
+            await _activityService.fetchActivities(userId: user.uid);
+        setState(() {
+          _activities = activities.isNotEmpty ? activities : [];
+          _selectedCategory = 'All'; // ตั้งค่าเริ่มต้นเป็น All
+          _filteredActivities = _filterActivities(); // กรองกิจกรรมทันที
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _activities = [];
+          _filteredActivities = [];
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       print('Error loading activities: $e');
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading activities: $e')),
-        );
-      }
+      setState(() {
+        _activities = [];
+        _filteredActivities = [];
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('เกิดข้อผิดพลาดในการโหลดกิจกรรม: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFF0C5217),
-      appBar: AppBar(
-        backgroundColor: Color(0xFF0C5217),
-        title: Text('CALENDAR', style: TextStyle(color: Colors.white)),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        elevation: 0,
-      ),
-      body: Column(
-        children: [
-          Theme(
-            data: Theme.of(context).copyWith(
-              dividerColor: Colors.transparent,
-              colorScheme: ColorScheme.dark(
-                primary: Colors.white,
-              ),
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            floating: true,
+            snap: true,
+            backgroundColor: Colors.green.shade700,
+            title: Text(
+              'My Calendar',
+              style:
+                  TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
             ),
-            child: ExpansionTile(
-              initiallyExpanded: _isCalendarExpanded,
-              onExpansionChanged: (expanded) {
-                setState(() {
-                  _isCalendarExpanded = expanded;
-                });
-              },
-              title: Text(
-                'Mouth Calendar',
-                style:
-                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-              trailing: Icon(
-                _isCalendarExpanded
-                    ? Icons.keyboard_arrow_up
-                    : Icons.keyboard_arrow_down,
-                color: Colors.white,
-              ),
-              children: [
-                _buildCalendar(),
-              ],
-            ),
+            actions: [],
           ),
-          Expanded(
-            child: Container(
-              color: Colors.white,
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    Theme(
-                      data: Theme.of(context).copyWith(
-                        dividerColor: Colors.transparent,
-                      ),
-                      child: ExpansionTile(
-                        initiallyExpanded: _isPersonalActivitiesExpanded,
-                        onExpansionChanged: (expanded) {
-                          setState(() {
-                            _isPersonalActivitiesExpanded = expanded;
-                          });
-                        },
-                        title: Text(
-                          'Personal Activities',
-                          style: TextStyle(
-                            color: Color(0xFF0C5217),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                          ),
-                        ),
-                        trailing: Icon(
-                          _isPersonalActivitiesExpanded
-                              ? Icons.keyboard_arrow_up
-                              : Icons.keyboard_arrow_down,
-                          color: Color(0xFF0C5217),
-                        ),
-                        children: [
-                          _buildActivitiesList(_activities),
-                        ],
-                      ),
-                    ),
-                    Theme(
-                      data: Theme.of(context).copyWith(
-                        dividerColor: Colors.transparent,
-                      ),
-                      child: ExpansionTile(
-                        initiallyExpanded: _isGroupActivitiesExpanded,
-                        onExpansionChanged: (expanded) {
-                          setState(() {
-                            _isGroupActivitiesExpanded = expanded;
-                          });
-                        },
-                        title: Text(
-                          'Group Activities',
-                          style: TextStyle(
-                            color: Color(0xFF0C5217),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                          ),
-                        ),
-                        trailing: Icon(
-                          _isGroupActivitiesExpanded
-                              ? Icons.keyboard_arrow_up
-                              : Icons.keyboard_arrow_down,
-                          color: Color(0xFF0C5217),
-                        ),
-                        children: [
-                          _buildActivitiesList(_groupActivities),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          SliverToBoxAdapter(
+            child: _buildActivityOverviewCards(),
+          ),
+          SliverToBoxAdapter(
+            child: _buildEnhancedCalendarSection(),
+          ),
+          SliverToBoxAdapter(
+            child: _buildCategoryChips(),
+          ),
+          _buildActivityListSliver(),
+        ],
+      ),
+      floatingActionButton: _buildFloatingActionButton(),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
+
+  SliverList _buildActivityListSliver() {
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          return _buildAnimatedActivityCard(_filteredActivities[index]);
+        },
+        childCount: _filteredActivities.length,
+      ),
+    );
+  }
+
+  Widget _buildAnimatedActivityCard(Activity activity) {
+    return AnimatedContainer(
+      duration: Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade300,
+            blurRadius: 10,
+            offset: Offset(0, 4),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => AddActivityScreen()),
-          );
-          if (result != null && result is Activity) {
-            try {
-              final savedActivity =
-                  await _activityDatabase.saveActivity(widget.username, result);
-              setState(() {
-                _activities.add(savedActivity);
-                _sortActivities();
-              });
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Activity saved successfully')),
-                );
-              }
-            } catch (e) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error saving activity: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            }
-          }
-        },
-        backgroundColor: const Color(0xFF0C5217),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(30.0),
+      child: ListTile(
+        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        leading: Container(
+          padding: EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: _getStatusColor(activity.status).withOpacity(0.2),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            _getIconForActivityType(activity.type),
+            color: _getStatusColor(activity.status),
+          ),
         ),
-        icon: const Icon(
-          Icons.add,
-          color: Colors.white,
-          size: 20,
-        ),
-        label: const Text(
-          "New Activity",
+        title: Text(
+          activity.title,
           style: TextStyle(
-            color: Colors.white,
-            fontSize: 14,
             fontWeight: FontWeight.bold,
+            color: Color(0xFF0C5217),
           ),
         ),
-        elevation: 2,
-        extendedPadding: const EdgeInsets.symmetric(
-          horizontal: 20.0,
-          vertical: 12.0,
+        subtitle: Text(
+          '${DateFormat('HH:mm').format(activity.date)} - ${activity.description}',
+          style: TextStyle(color: Colors.grey.shade600),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
-      ),
-      bottomNavigationBar: MotionTabBar(
-        labels: const ["Home", "Account", "Notes", "Calendar", "Groups"],
-        icons: const [
-          Icons.home,
-          Icons.person,
-          Icons.book,
-          Icons.calendar_today,
-          Icons.group,
-        ],
-        initialSelectedTab: "Calendar",
-        tabIconColor: const Color(0xFF0C5217),
-        tabSelectedColor: Colors.green,
-        onTabItemSelected: (int index) {
-          setState(() {
-            _currentIndex = index;
-          });
-          switch (index) {
-            case 0:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => HomePage(
-                    username: widget.username,
-                    userEmail: widget.userEmail,
-                  ),
-                ),
-              );
-              break;
-            case 1:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AccountPage(
-                    initialUsername: widget.username,
-                    userEmail: widget.userEmail,
-                  ),
-                ),
-              );
-              break;
-            case 2:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => NotePage(
-                    username: widget.username,
-                    userEmail: widget.userEmail,
-                  ),
-                ),
-              );
-              break;
-            case 3:
-              // Already in Calendar page
-              break;
-            case 4:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => GroupPage(
-                    username: widget.username,
-                    userEmail: widget.userEmail,
-                  ),
-                ),
-              );
-              break;
-          }
-        },
-      ),
-    );
-  }
-
-  Widget _buildCalendar() {
-    final daysInMonth =
-        DateTime(_currentMonth.year, _currentMonth.month + 1, 0).day;
-    final now = DateTime.now();
-
-    return Container(
-      padding: EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              IconButton(
-                icon: Icon(Icons.chevron_left, color: Colors.white),
-                onPressed: () {
-                  setState(() {
-                    _currentMonth = DateTime(
-                        _currentMonth.year, _currentMonth.month - 1, 1);
-                  });
-                },
-              ),
-              Text(
-                DateFormat('MMMM yyyy').format(_currentMonth),
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold),
-              ),
-              IconButton(
-                icon: Icon(Icons.chevron_right, color: Colors.white),
-                onPressed: () {
-                  setState(() {
-                    _currentMonth = DateTime(
-                        _currentMonth.year, _currentMonth.month + 1, 1);
-                  });
-                },
-              ),
-            ],
+        trailing: Container(
+          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: _getStatusColor(activity.status).withOpacity(0.2),
+            borderRadius: BorderRadius.circular(10),
           ),
-          SizedBox(height: 10),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: NeverScrollableScrollPhysics(),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 7,
-              childAspectRatio: 1,
+          child: Text(
+            activity.status,
+            style: TextStyle(
+              color: _getStatusColor(activity.status),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
             ),
-            itemCount: 7 + daysInMonth,
-            itemBuilder: (context, index) {
-              if (index < 7) {
-                final weekday =
-                    ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'][index];
-                return Center(
-                    child:
-                        Text(weekday, style: TextStyle(color: Colors.white)));
-              }
-              final day = index - 6;
-              final date =
-                  DateTime(_currentMonth.year, _currentMonth.month, day);
-              final isToday = date.day == now.day &&
-                  date.month == now.month &&
-                  date.year == now.year;
-              final hasActivity = _activities.any((activity) =>
-                      activity.date.year == date.year &&
-                      activity.date.month == date.month &&
-                      activity.date.day == date.day) ||
-                  _groupActivities.any((activity) =>
-                      activity.date.year == date.year &&
-                      activity.date.month == date.month &&
-                      activity.date.day == date.day);
-
-              return Center(
-                child: Container(
-                  width: 32, // ลดขนาดความกว้าง
-                  height: 32, // ลดขนาดความสูง
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: hasActivity
-                        ? Colors.white
-                        : (isToday ? Colors.white.withOpacity(0.3) : null),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '$day',
-                      style: TextStyle(
-                        color: hasActivity ? Color(0xFF0C5217) : Colors.white,
-                        fontWeight: isToday || hasActivity
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                        fontSize: 14, // ลดขนาดตัวอักษร
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
           ),
-        ],
+        ),
+        onTap: () => _showActivityDetailsModal(activity, 0, _activities),
       ),
     );
   }
 
-  Widget _buildActivitiesList(List<Activity> activities) {
+  Color _getActivityTypeColor(String type) {
+    switch (type) {
+      case 'Personal':
+        return Colors.blue.shade400;
+      case 'Group':
+        return Colors.purple.shade400;
+      default:
+        return Colors.green.shade400;
+    }
+  }
+
+  Widget _buildActivityCardContent(Activity activity) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        activities.isEmpty
-            ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Text(
-                    'No activities found',
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 16.0,
-                    ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                activity.title,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green.shade900,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: _getActivityTypeColor(activity.type),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                activity.type,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 10),
+        Text(
+          activity.description,
+          style: TextStyle(
+            color: Colors.black87,
+            fontSize: 14,
+          ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.calendar_today,
+                  size: 16,
+                  color: Colors.green.shade600,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  DateFormat('dd MMM yyyy').format(activity.date),
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 12,
                   ),
                 ),
-              )
-            : ListView.builder(
-                shrinkWrap: true,
-                physics: NeverScrollableScrollPhysics(),
-                itemCount: activities.length,
-                itemBuilder: (context, index) {
-                  final activity = activities[index];
-                  return Card(
-                    margin:
-                        EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                    child: InkWell(
-                      onTap: () =>
-                          _showActivityDetails(activity, index, activities),
-                      child: Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              DateFormat('dd MMM. yyyy').format(activity.date),
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF0C5217),
-                              ),
-                            ),
-                            SizedBox(height: 8.0),
-                            Text(
-                              activity.title,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            SizedBox(height: 4.0),
-                            Text(
-                              '${activity.startTime.format(context)} - ${activity.endTime.format(context)}',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            if (activity.description.isNotEmpty) ...[
-                              SizedBox(height: 8.0),
-                              Text(
-                                activity.description,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
+              ],
+            ),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _getStatusColor(activity.status),
+                borderRadius: BorderRadius.circular(8),
               ),
+              child: Text(
+                activity.status,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
 
-  void _showActivityDetails(
+  Widget _buildCalendarWithDraggableSheet() {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.4, // ขนาดเริ่มต้นของ Sheet
+      minChildSize: 0.2, // ขนาดต่ำสุด
+      maxChildSize: 0.9, // ขนาดสูงสุด
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 10,
+                  offset: Offset(0, -4),
+                )
+              ]),
+          child: CustomScrollView(
+            controller: scrollController,
+            slivers: [
+              // Handle สำหรับลาก
+              SliverToBoxAdapter(
+                child: Center(
+                  child: Container(
+                    width: 50,
+                    height: 6,
+                    margin: EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+              ),
+
+              // ปฏิทิน
+              SliverToBoxAdapter(
+                child: TableCalendar(
+                  firstDay: DateTime.utc(2010, 1, 1),
+                  lastDay: DateTime.utc(2030, 12, 31),
+                  focusedDay: _currentMonth,
+                  calendarStyle: CalendarStyle(
+                    todayDecoration: BoxDecoration(
+                      color: Colors.green.shade700,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  onDaySelected: (selectedDay, focusedDay) {
+                    _showDayActivities(selectedDay);
+                  },
+                ),
+              ),
+
+              // กิจกรรมประจำวัน
+              _buildDailyActivitiesList(),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDailyActivitiesList() {
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          // สร้าง Widget สำหรับแสดงกิจกรรมแต่ละรายการ
+          return _buildActivityCard(_filteredActivities[index]);
+        },
+        childCount: _filteredActivities.length,
+      ),
+    );
+  }
+
+  Widget _buildEnhancedCalendarSection() {
+    return GestureDetector(
+      onVerticalDragUpdate: (details) {
+        if (details.delta.dy > 20) {
+          _toggleCalendarFormat();
+        } else if (details.delta.dy < -20) {
+          _toggleCalendarFormat();
+        }
+        HapticFeedback.lightImpact();
+      },
+      child: Container(
+        margin: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.green.shade50, Colors.white],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.green.shade100.withOpacity(0.5),
+              spreadRadius: 2,
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            // Custom Header with Month Navigation
+            _buildCustomCalendarHeader(),
+
+            // Animated Calendar
+            AnimatedSwitcher(
+              duration: Duration(milliseconds: 300),
+              child: TableCalendar(
+                key: UniqueKey(),
+                firstDay: DateTime.utc(2010, 1, 1),
+                lastDay: DateTime.utc(2030, 12, 31),
+                focusedDay: _currentMonth,
+
+                // Calendar Format Control
+                calendarFormat: _calendarFormat,
+                availableCalendarFormats: {
+                  CalendarFormat.month: 'Month',
+                  CalendarFormat.week: 'Week',
+                },
+
+                // Styling
+                headerVisible: false, // Hide default header
+                daysOfWeekStyle: _buildDaysOfWeekStyle(),
+                calendarStyle: _buildCalendarStyle(),
+
+                // Custom Day Builder
+                calendarBuilders: CalendarBuilders(
+                  defaultBuilder: _enhancedDayBuilder,
+                  todayBuilder: _todayBuilder,
+                  selectedBuilder: _selectedBuilder,
+                  markerBuilder: _eventMarkerBuilder,
+                ),
+
+                // Interactions
+                onDaySelected: (selectedDay, focusedDay) {
+                  setState(() {
+                    _currentMonth = focusedDay;
+                  });
+                  _showEnhancedDayActivities(selectedDay);
+                },
+
+                // Format Change
+                onFormatChanged: (format) {
+                  setState(() {
+                    _calendarFormat = format;
+                  });
+                },
+
+                // Event Loader
+                eventLoader: _getEventsForDay,
+              ),
+            ),
+
+            // Activity Indicator
+            _buildActivityIndicator(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEnhancedDayActivities(DateTime selectedDay) {
+    final dayActivities = _getEventsForDay(selectedDay);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30.0)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.green.shade50, Colors.white],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(30.0)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 10,
+                    offset: Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  // Handle untuk drag
+                  Container(
+                    width: 50,
+                    height: 6,
+                    margin: EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+
+                  // Header วันที่
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          DateFormat('EEEE, dd MMM yyyy').format(selectedDay),
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0C5217),
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.add_circle_outline,
+                              color: Color(0xFF0C5217)),
+                          onPressed: _navigateToAddActivity,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Divider
+                  Divider(
+                    color: Colors.grey.shade300,
+                    thickness: 1,
+                    indent: 16,
+                    endIndent: 16,
+                  ),
+
+                  // Section Personal Activities
+                  _buildActivitySection(
+                      dayActivities, 'Personal Activities', 'Personal'),
+
+                  // Section Group Activities
+                  _buildActivitySection(
+                      dayActivities, 'Group Activities', 'Group'),
+
+                  // Kondisi ketika tidak ada aktivitas
+                  if (dayActivities.isEmpty)
+                    Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.event_busy,
+                              size: 100,
+                              color: Colors.grey.shade300,
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'No activities for this day',
+                              style: TextStyle(
+                                color: Colors.grey.shade500,
+                                fontSize: 18,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildCustomCalendarHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Month and Year
+          Text(
+            DateFormat('MMMM yyyy').format(_currentMonth),
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0C5217),
+            ),
+          ),
+
+          // Navigation Buttons
+          Row(
+            children: [
+              IconButton(
+                icon: Icon(Icons.chevron_left, color: Color(0xFF0C5217)),
+                onPressed: _goToPreviousMonth,
+              ),
+              IconButton(
+                icon: Icon(Icons.chevron_right, color: Color(0xFF0C5217)),
+                onPressed: _goToNextMonth,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _enhancedDayBuilder(
+      BuildContext context, DateTime day, DateTime focusedDay) {
+    final events = _getEventsForDay(day);
+    final isToday = isSameDay(day, DateTime.now());
+
+    return AnimatedContainer(
+      duration: Duration(milliseconds: 300),
+      decoration: BoxDecoration(
+        color: isToday ? Colors.green.shade100 : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        border: events.isNotEmpty
+            ? Border.all(color: Colors.green.shade300, width: 1.5)
+            : null,
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '${day.day}',
+              style: TextStyle(
+                color: isToday
+                    ? Colors.green.shade900
+                    : (events.isNotEmpty
+                        ? Colors.green.shade700
+                        : Colors.black87),
+                fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+                fontSize: 14,
+              ),
+            ),
+            if (events.isNotEmpty)
+              Container(
+                width: 5,
+                height: 5,
+                margin: EdgeInsets.only(top: 3),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade400,
+                  shape: BoxShape.circle,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  DaysOfWeekStyle _buildDaysOfWeekStyle() {
+    return DaysOfWeekStyle(
+      weekdayStyle: TextStyle(
+        color: Colors.green.shade700,
+        fontWeight: FontWeight.w600,
+      ),
+      weekendStyle: TextStyle(
+        color: Colors.red.shade400,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+
+  CalendarStyle _buildCalendarStyle() {
+    return CalendarStyle(
+      // Today Decoration
+      todayDecoration: BoxDecoration(
+        color: Colors.green.shade700,
+        shape: BoxShape.circle,
+      ),
+
+      // Selected Day Decoration
+      selectedDecoration: BoxDecoration(
+        color: Colors.green.shade800,
+        shape: BoxShape.circle,
+      ),
+
+      // Styling
+      defaultTextStyle: TextStyle(
+        color: Colors.black87,
+        fontSize: 14,
+      ),
+      weekendTextStyle: TextStyle(
+        color: Colors.red.shade400,
+        fontSize: 14,
+      ),
+
+      // Outside Days
+      outsideDaysVisible: false,
+    );
+  }
+
+  Widget? _eventMarkerBuilder(BuildContext context, DateTime day, List events) {
+    if (events.isNotEmpty) {
+      return Positioned(
+        right: 5,
+        bottom: 5,
+        child: Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(
+            color: Colors.green.shade600,
+            shape: BoxShape.circle,
+          ),
+        ),
+      );
+    }
+    return null;
+  }
+
+  Widget _buildActivityIndicator() {
+    // Count activities for the current month
+    int monthActivities = _activities
+        .where((activity) =>
+            activity.date.year == _currentMonth.year &&
+            activity.date.month == _currentMonth.month)
+        .length;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Activities this month',
+            style: TextStyle(
+              color: Colors.green.shade800,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.green.shade100,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Text(
+              // Added 'child' parameter here
+              '$monthActivities',
+              style: TextStyle(
+                color: Colors.green.shade800,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _toggleCalendarFormat() {
+    setState(() {
+      _calendarFormat = _calendarFormat == CalendarFormat.month
+          ? CalendarFormat.week
+          : CalendarFormat.month;
+    });
+  }
+
+  Widget _buildEventMarker(int eventCount) {
+    return Positioned(
+      right: 5,
+      bottom: 5,
+      child: Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(
+          color: Colors.green.shade600,
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: Text(
+            '$eventCount',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 6,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryChips() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: ['All', 'Personal', 'Group']
+              .map((category) => _buildCategoryChip(category))
+              .toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryChip(String category) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 4),
+      child: ChoiceChip(
+        label: Text(
+          category,
+          style: TextStyle(
+            color: _selectedCategory.toLowerCase() == category.toLowerCase()
+                ? Colors.white
+                : Colors.green.shade700,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        selected: _selectedCategory.toLowerCase() == category.toLowerCase(),
+        selectedColor: Colors.green.shade700,
+        backgroundColor: Colors.green.shade100,
+        pressElevation: 5,
+        shadowColor: Colors.green.shade200,
+        onSelected: (selected) {
+          setState(() {
+            _selectedCategory = selected ? category : 'All';
+            _filteredActivities = _filterActivities();
+          });
+        },
+      ),
+    );
+  }
+
+  void _showImprovedActivityDetails(Activity activity) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return Container(
+          padding: EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                activity.title,
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 10),
+              Text(DateFormat('dd MMM yyyy').format(activity.date)),
+              // เพิ่มรายละเอียดกิจกรรมเพิ่มเติมที่ต้องการแสดง
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  SliverList _buildImprovedActivityList(List<Activity> activities) {
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) => _buildEnhancedActivityCard(activities[index]),
+        childCount: activities.length,
+      ),
+    );
+  }
+
+  Widget _buildEnhancedActivityCard(Activity activity) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.green.shade50, Colors.white],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.shade100.withOpacity(0.3),
+            spreadRadius: 1,
+            blurRadius: 5,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: _getStatusColor(activity.status).withOpacity(0.2),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            _getIconForActivityType(activity.type),
+            color: _getStatusColor(activity.status),
+          ),
+        ),
+        title: Text(
+          activity.title,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0C5217),
+          ),
+        ),
+        subtitle: Text(
+          DateFormat('dd MMM yyyy').format(activity.date),
+          style: TextStyle(color: Colors.grey.shade600),
+        ),
+        trailing: Chip(
+          label: Text(
+            activity.status,
+            style: TextStyle(color: Colors.white, fontSize: 12),
+          ),
+          backgroundColor: _getStatusColor(activity.status),
+        ),
+        onTap: () => _showImprovedActivityDetails(activity),
+      ),
+    );
+  }
+
+  IconData _getIconForActivityType(String type) {
+    switch (type) {
+      case 'Personal':
+        return Icons.person;
+      case 'Group':
+        return Icons.group;
+      default:
+        return Icons.event;
+    }
+  }
+
+  Widget _buildFancyFloatingActionButton() {
+    return FloatingActionButton.extended(
+      icon: Icon(Icons.add, color: Colors.white),
+      label: Text('Add Activity'),
+      backgroundColor: Color(0xFF0C5217),
+      elevation: 10,
+      onPressed: _navigateToAddActivity,
+    );
+  }
+
+  SliverList _buildCompactActivityList(List<Activity> activities) {
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) => _buildCompactActivityCard(activities[index]),
+        childCount: activities.length,
+      ),
+    );
+  }
+
+  Widget _buildDayActivities(DateTime day) {
+    final activities = _getEventsForDay(day);
+    return ExpansionTile(
+      title: Text(DateFormat('EEEE, MMM d').format(day)),
+      children: activities.map((activity) {
+        return ListTile(
+          title: Text(activity.title),
+          subtitle: Text(DateFormat('HH:mm').format(activity.date)),
+          trailing: Chip(
+            label: Text(activity.status),
+            backgroundColor: _getStatusColor(activity.status),
+          ),
+          onTap: () => _showActivityDetails(activity),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildCompactActivityCard(Activity activity) {
+    return Card(
+      elevation: 4,
+      margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15), // เพิ่มความโค้งมน
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            // เพิ่ม Gradient Background
+            colors: [Colors.white, Colors.green.shade50],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: ListTile(
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          title: Text(
+            activity.title,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0C5217),
+              fontSize: 16, // เพิ่มขนาดฟอนต์
+            ),
+          ),
+          subtitle: Text(
+            DateFormat('dd MMM yyyy').format(activity.date),
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 12,
+            ),
+          ),
+          trailing: Container(
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: _getStatusColor(activity.status).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              activity.status,
+              style: TextStyle(
+                color: _getStatusColor(activity.status),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          onTap: () => _showActivityDetailsModal(activity, 0, _activities),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppBar() {
+    return SliverAppBar(
+      backgroundColor: Color(0xFF0C5217),
+      floating: true,
+      pinned: true,
+      title: Text(
+        'Calendar',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 24,
+        ),
+      ),
+      actions: [
+        IconButton(
+          icon: Icon(Icons.filter_list, color: Colors.white),
+          onPressed: _showFilterOptions,
+        ),
+        IconButton(
+          icon: Icon(Icons.sort, color: Colors.white),
+          onPressed: _showSortOptions,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCalendarSection(BoxConstraints constraints) {
+    return Container(
+      height: 250, // กำหนดความสูงคงที่
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF0C5217), Color(0xFF0C5217).withOpacity(0.8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(30),
+          bottomRight: Radius.circular(30),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Month Navigation Header
+          _buildMonthNavigationHeader(),
+
+          // Calendar with Constrained Height
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: TableCalendar(
+                // Basic configuration
+                firstDay: DateTime.utc(2010, 10, 16),
+                lastDay: DateTime.utc(2030, 3, 14),
+                focusedDay: _currentMonth,
+
+                // Remove default header
+                headerVisible: false,
+
+                // Custom builders to prevent overflow
+                calendarBuilders: CalendarBuilders(
+                  defaultBuilder: _customCompactDayBuilder,
+                ),
+
+                // Compact styling
+                calendarStyle: CalendarStyle(
+                  defaultTextStyle: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10, // Smaller font
+                  ),
+                  weekendTextStyle: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 10,
+                  ),
+
+                  // Minimal padding
+                  cellPadding: EdgeInsets.zero,
+                  cellMargin: EdgeInsets.all(1),
+                ),
+
+                // Days of week styling
+                daysOfWeekStyle: DaysOfWeekStyle(
+                  weekdayStyle: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 8, // Very small font
+                  ),
+                  weekendStyle: TextStyle(
+                    color: Colors.white54,
+                    fontSize: 8,
+                  ),
+                ),
+
+                // Day selection handler
+                onDaySelected: (selectedDay, focusedDay) {
+                  setState(() {
+                    _currentMonth = focusedDay;
+                  });
+                  _showDayActivities(selectedDay);
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _customCompactDayBuilder(
+      BuildContext context, DateTime day, DateTime focusedDay) {
+    final events = _getEventsForDay(day);
+    final isToday = isSameDay(day, DateTime.now());
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isToday ? Colors.white.withOpacity(0.3) : Colors.transparent,
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '${day.day}',
+              style: TextStyle(
+                color: isToday
+                    ? Colors.white
+                    : (events.isNotEmpty ? Colors.white : Colors.white70),
+                fontSize: 10, // Very small font
+                fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            // Tiny event indicator
+            if (events.isNotEmpty)
+              Container(
+                width: 4,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade200,
+                  shape: BoxShape.circle,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _customDayBuilder(
+      BuildContext context, DateTime day, DateTime focusedDay) {
+    final events = _getEventsForDay(day);
+    final isToday = isSameDay(day, DateTime.now());
+
+    return AnimatedContainer(
+      duration: Duration(milliseconds: 300),
+      decoration: BoxDecoration(
+        color: isToday ? Colors.green.shade100 : Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        border: events.isNotEmpty
+            ? Border.all(color: Colors.green.shade300, width: 1)
+            : null,
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '${day.day}',
+              style: TextStyle(
+                color: isToday
+                    ? Colors.green.shade900
+                    : (events.isNotEmpty
+                        ? Colors.green.shade700
+                        : Colors.black87),
+                fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+                fontSize: _calendarFormat == CalendarFormat.month ? 14 : 10,
+              ),
+            ),
+            if (events.isNotEmpty && _calendarFormat == CalendarFormat.month)
+              Container(
+                width: 4,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.green.shade400,
+                  shape: BoxShape.circle,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _preventOverflow(Widget child) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: constraints.maxWidth,
+              minHeight: constraints.maxHeight,
+            ),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _todayBuilder(
+      BuildContext context, DateTime day, DateTime focusedDay) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.4),
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Text(
+          '${day.day}',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _selectedBuilder(
+      BuildContext context, DateTime day, DateTime focusedDay) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.5),
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Text(
+          '${day.day}',
+          style: TextStyle(
+            color: Color(0xFF0C5217),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _markerBuilder(BuildContext context, DateTime day, List events) {
+    return events.isNotEmpty
+        ? Positioned(
+            bottom: 2,
+            right: 2,
+            child: Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: Colors.amber.shade200,
+                shape: BoxShape.circle,
+              ),
+            ),
+          )
+        : Container();
+  }
+
+  Widget _buildMonthNavigationHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            DateFormat('MMMM yyyy').format(_currentMonth),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Row(
+            children: [
+              IconButton(
+                icon: Icon(Icons.chevron_left, color: Colors.white),
+                onPressed: _goToPreviousMonth,
+              ),
+              IconButton(
+                icon: Icon(Icons.chevron_right, color: Colors.white),
+                onPressed: _goToNextMonth,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  } // Month Navigation Methods
+
+  void _goToPreviousMonth() {
+    setState(() {
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month - 1);
+    });
+  }
+
+  void _goToNextMonth() {
+    setState(() {
+      _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + 1);
+    });
+  }
+
+  Widget _buildFloatingActionButton() {
+    return FloatingActionButton.extended(
+      onPressed: _navigateToAddActivity,
+      backgroundColor: Color(0xFF0C5217),
+      icon: Icon(
+        Icons.add,
+        color: Colors.white,
+      ),
+      label: Text(
+        'New Activity',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      elevation: 10,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16), // ทำมุมมนมากขึ้น
+      ),
+    );
+  }
+
+  Widget _buildActivitiesSection(String title, List<Activity> activities) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(title),
+        _buildActivityList(activities),
+      ],
+    );
+  }
+
+  List<Activity> _getEventsForDay(DateTime day) {
+    return _activities
+        .where((activity) =>
+            activity.date.year == day.year &&
+            activity.date.month == day.month &&
+            activity.date.day == day.day)
+        .toList();
+  }
+
+  void _showDayActivities(DateTime selectedDay) {
+    final dayActivities = _getEventsForDay(selectedDay);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30.0)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.green.shade50, Colors.white],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(30.0)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 10,
+                    offset: Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  // Handle untuk drag
+                  Container(
+                    width: 50,
+                    height: 6,
+                    margin: EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+
+                  // Header วันที่
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          DateFormat('EEEE, dd MMM yyyy').format(selectedDay),
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0C5217),
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.add_circle_outline,
+                              color: Color(0xFF0C5217)),
+                          onPressed: _navigateToAddActivity,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Divider
+                  Divider(
+                    color: Colors.grey.shade300,
+                    thickness: 1,
+                    indent: 16,
+                    endIndent: 16,
+                  ),
+
+                  // Section Personal Activities
+                  _buildActivitySection(
+                      dayActivities, 'Personal Activities', 'Personal'),
+
+                  // Section Group Activities
+                  _buildActivitySection(
+                      dayActivities, 'Group Activities', 'Group'),
+
+                  // Kondisi ketika tidak ada aktivitas
+                  if (dayActivities.isEmpty)
+                    Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.event_busy,
+                              size: 100,
+                              color: Colors.grey.shade300,
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'No activities for this day',
+                              style: TextStyle(
+                                color: Colors.grey.shade500,
+                                fontSize: 18,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildActivityCard(Activity activity) {
+    return Card(
+      margin: EdgeInsets.symmetric(vertical: 8),
+      elevation: 4, // เพิ่มเงาให้การ์ด
+      child: ListTile(
+        title: Text(
+          activity.title,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0C5217),
+          ),
+        ),
+        subtitle: Text(
+          DateFormat('dd MMM yyyy').format(activity.date),
+          style: TextStyle(color: Colors.grey),
+        ),
+        trailing: Chip(
+          label: Text(
+            activity.status,
+            style: TextStyle(color: Colors.white, fontSize: 12),
+          ),
+          backgroundColor: _getStatusColor(activity.status),
+        ),
+        onTap: () => _showActivityDetailsModal(activity, 0, _activities),
+      ),
+    );
+  }
+
+  Widget _buildActivityList(List<Activity> activities) {
+    if (activities.isEmpty) {
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            'No activities found',
+            style: TextStyle(color: Colors.grey, fontSize: 16),
+          ),
+        ),
+      );
+    }
+
+    return SliverPadding(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (BuildContext context, int index) {
+            return ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: 200, // จำกัดความสูงสูงสุด
+              ),
+              child: _buildActivityCard(activities[index]),
+            );
+          },
+          childCount: activities.length,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, {VoidCallback? onSeeAll}) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0C5217),
+            ),
+          ),
+          if (onSeeAll != null)
+            TextButton(
+              onPressed: onSeeAll,
+              child: Text(
+                'See All',
+                style: TextStyle(color: Color(0xFF0C5217)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showFilterOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Filter Activities',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            // Add filter options here
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSortOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Sort Activities',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            // Add sort options here
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showActivityOptions(Activity activity) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Options for ${activity.title}',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            ListTile(
+              title: Text('Edit'),
+              onTap: () {
+                Navigator.pop(context);
+                _editActivity(activity);
+              },
+            ),
+            ListTile(
+              title: Text('Delete'),
+              onTap: () {
+                Navigator.pop(context);
+                _deleteActivity(activity);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+// เพิ่มฟังก์ชันในการแสดงกิจกรรม
+  Widget _buildActivitiesList(List<Activity> activities) {
+    return ListView.builder(
+      itemCount: activities.length,
+      itemBuilder: (context, index) {
+        final activity = activities[index];
+        return Card(
+          margin: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+          child: ListTile(
+            title: Text(activity.title),
+            subtitle: Text(DateFormat('dd MMM yyyy').format(activity.date)),
+            trailing: Text(activity.status),
+            onTap: () => _showActivityDetailsModal(activity, index,
+                activities), // เปลี่ยนเป็นเรียกใช้ _showActivityDetailsModal
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCalendarActivitiesList(List<Activity> activities) {
+    return Container(
+      color: Colors.white,
+      child: activities.isEmpty
+          ? Center(
+              child: Text(
+                'No activities found',
+                style: TextStyle(color: Colors.grey),
+              ),
+            )
+          : ListView.builder(
+              shrinkWrap: true,
+              physics: NeverScrollableScrollPhysics(),
+              itemCount: activities.length,
+              itemBuilder: (context, index) {
+                final activity = activities[index];
+                return Card(
+                  margin: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                  child: ListTile(
+                    title: Text(
+                      activity.title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0C5217),
+                      ),
+                    ),
+                    subtitle: Text(
+                      DateFormat('dd MMM yyyy').format(activity.date),
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                    trailing: Text(
+                      activity.status,
+                      style: TextStyle(
+                        color: _getStatusColor(activity.status),
+                      ),
+                    ),
+                    onTap: () =>
+                        _showActivityDetailsModal(activity, index, activities),
+                  ),
+                );
+              },
+            ),
+    );
+  } // แก้ไขฟังก์ชันแสดงรายละเอียดกิจกรรมให้รับ 3 argument
+
+  void _showActivityDetailsModal(
       Activity activity, int index, List<Activity> activities) {
     showModalBottomSheet(
       context: context,
@@ -530,7 +1854,7 @@ class _CalendarPageState extends State<CalendarPage> {
                         ),
                       ],
                     ),
-                    SizedBox(height: 16.0),
+                    SizedBox(height: 10),
                     Text(
                       activity.title,
                       style: TextStyle(
@@ -543,7 +1867,6 @@ class _CalendarPageState extends State<CalendarPage> {
                       'Date: ${DateFormat('EEEE, MMM d, y').format(activity.date)}',
                       style: TextStyle(fontSize: 16.0),
                     ),
-                    SizedBox(height: 4.0),
                     Text(
                       'Time: ${activity.startTime.format(context)} - ${activity.endTime.format(context)}',
                       style: TextStyle(fontSize: 16.0),
@@ -556,27 +1879,17 @@ class _CalendarPageState extends State<CalendarPage> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(height: 4.0),
                     Text(
                       activity.description,
                       style: TextStyle(fontSize: 16.0),
                     ),
-                    SizedBox(height: 24.0),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _editActivity(activity, index, activities);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Color(0xFF0C5217),
-                          ),
-                          child: Text('Edit',
-                              style: TextStyle(color: Colors.white)),
-                        ),
-                      ],
+                    SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _editActivity(activity);
+                      },
+                      child: Text('Edit Activity'),
                     ),
                   ],
                 ),
@@ -588,15 +1901,391 @@ class _CalendarPageState extends State<CalendarPage> {
     );
   }
 
-  void _editActivity(
-      Activity activity, int index, List<Activity> activities) async {
-    if (activity.id == null || activity.id!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Cannot edit this activity: Missing ID')),
+// เพิ่มฟังก์ชันสำหรับแสดงสถานะกิจกรรม
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'Completed':
+        return Colors.green.shade700;
+      case 'In Progress':
+        return Colors.blue.shade700;
+      case 'Pending':
+        return Colors.orange.shade700;
+      default:
+        return Colors.grey.shade700;
+    }
+  }
+
+  Future<void> _fetchActivities() async {
+    try {
+      setState(() => _isLoading = true);
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final activities =
+            await _activityService.fetchActivities(userId: user.uid);
+
+        setState(() {
+          _activities = activities;
+          _filteredActivities = _filterActivities();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('เกิดข้อผิดพลาดในการโหลดกิจกรรม: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  List<Activity> _filterActivities() {
+    // ถ้าไม่มีกิจกรรมเลย ให้ return list ว่าง
+    if (_activities.isEmpty) return [];
+
+    // กรองกิจกรรมโดยค่าเริ่มต้นเป็น All
+    return _activities.where((activity) {
+      return _selectedCategory == 'All' || activity.type == _selectedCategory;
+    }).toList();
+  }
+
+  void _navigateToAddActivity() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => AddActivityScreen()),
+    );
+
+    if (result is Activity) {
+      try {
+        // สร้าง Activity ใหม่
+        await _activityService.createActivity(result);
+        // รีโหลดรายการกิจกรรม
+        await _loadActivities(); // เพิ่ม () เพื่อเรียกใช้ฟังก์ชัน
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('สร้างกิจกรรมสำเร็จ'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildCalendar() {
+    return Container(
+      margin: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.shade300,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: TableCalendar(
+        firstDay: DateTime.utc(2010, 1, 1),
+        lastDay: DateTime.utc(2030, 12, 31),
+        focusedDay: _currentMonth,
+        onDaySelected: (selectedDay, focusedDay) {
+          setState(() {
+            _currentMonth = focusedDay;
+          });
+          _showDayActivities(selectedDay);
+        },
+        calendarStyle: CalendarStyle(
+          todayDecoration: BoxDecoration(
+            color: Colors.green.shade700,
+            shape: BoxShape.circle,
+          ),
+          selectedDecoration: BoxDecoration(
+            color: Colors.green.shade800,
+            shape: BoxShape.circle,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActivityOverviewCards() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: EdgeInsets.symmetric(horizontal: 16),
+      child: Row(),
+    );
+  }
+
+  Widget _buildSummaryCard({
+    required IconData icon,
+    required String title,
+    required String value,
+    required Color color,
+  }) {
+    return TweenAnimationBuilder(
+      duration: Duration(milliseconds: 500),
+      tween: Tween<double>(begin: 0, end: 1),
+      builder: (context, double opacity, child) {
+        return Opacity(
+          opacity: opacity,
+          child: Transform.translate(
+            offset: Offset(0, 20 * (1 - opacity)),
+            child: Container(
+              width: 160,
+              margin: EdgeInsets.only(right: 12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [color, color.withOpacity(0.7)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withOpacity(0.4),
+                    blurRadius: 15,
+                    offset: Offset(0, 8),
+                  )
+                ],
+              ),
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: Colors.white, size: 30),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSwipeableActivityCard(Activity activity) {
+    return Dismissible(
+      key: Key(activity.id ?? UniqueKey().toString()),
+      background: Container(
+        color: Colors.red,
+        alignment: Alignment.centerRight,
+        padding: EdgeInsets.symmetric(horizontal: 20),
+        child: Icon(Icons.delete, color: Colors.white),
+      ),
+      direction: DismissDirection.endToStart,
+      onDismissed: (direction) {
+        _deleteActivity(activity);
+      },
+      child: _buildAnimatedActivityCard(activity),
+    );
+  }
+
+  Widget _buildActivitySection(
+      List<Activity> activities, String title, String type) {
+    final filteredActivities =
+        activities.where((activity) => activity.type == type).toList();
+
+    if (filteredActivities.isEmpty) {
+      return Padding(
+        padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+        child: Text(
+          'No $title found',
+          style: TextStyle(
+            color: Colors.grey.shade500,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
       );
-      return;
     }
 
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0C5217),
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: filteredActivities.length,
+              itemBuilder: (context, index) {
+                final activity = filteredActivities[index];
+                return _buildAnimatedActivityCard(activity);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showActivityDetails(Activity activity) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                activity.title,
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 10),
+              Text(
+                'Date: ${DateFormat('EEEE, MMM d, y').format(activity.date)}',
+                style: TextStyle(fontSize: 16.0),
+              ),
+              Text(
+                'Time: ${activity.startTime.format(context)} - ${activity.endTime.format(context)}',
+                style: TextStyle(fontSize: 16.0),
+              ),
+              SizedBox(height: 16.0),
+              Text(
+                'Description:',
+                style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                activity.description,
+                style: TextStyle(fontSize: 16.0),
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _editActivity(activity);
+                },
+                child: Text('Edit Activity'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _customCalendarDayBuilder(
+      BuildContext context, DateTime day, DateTime focusedDay) {
+    final events = _getEventsForDay(day);
+    final isToday = isSameDay(day, DateTime.now());
+
+    return AnimatedContainer(
+      duration: Duration(milliseconds: 300),
+      decoration: BoxDecoration(
+          color: isToday ? Colors.green.shade100 : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: events.isNotEmpty
+              ? Border.all(color: Colors.green.shade300, width: 2)
+              : null),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Text(
+            '${day.day}',
+            style: TextStyle(
+              color: isToday ? Colors.green.shade900 : Colors.black87,
+              fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          if (events.isNotEmpty)
+            Positioned(
+              bottom: 3,
+              child: Container(
+                width: 5,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.green.shade400,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityDetailsSheet(Activity activity) {
+    return Container(
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            activity.title,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.green.shade800,
+            ),
+          ),
+          SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                DateFormat('dd MMMM yyyy').format(activity.date),
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+              Chip(
+                label: Text(
+                  activity.status,
+                  style: TextStyle(color: Colors.white),
+                ),
+                backgroundColor: _getStatusColor(activity.status),
+              ),
+            ],
+          ),
+          // ... (เพิ่มรายละเอียดอื่นๆ)
+        ],
+      ),
+    );
+  }
+
+  void _editActivity(Activity activity) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -604,50 +2293,70 @@ class _CalendarPageState extends State<CalendarPage> {
       ),
     );
 
-    if (result != null) {
-      try {
-        if (result == 'delete') {
-          await _activityDatabase.deleteActivity(activity.id!);
-          setState(() {
-            activities.removeAt(index);
-          });
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Activity deleted successfully')),
-            );
-          }
-        } else if (result is Activity) {
-          // สร้าง Activity ใหม่ที่มี id เดิม
-          Activity updatedActivity = Activity(
-            id: activity.id,
-            title: result.title,
-            description: result.description,
-            date: result.date,
-            startTime: result.startTime,
-            endTime: result.endTime,
-          );
-
-          await _activityDatabase.updateActivity(activity.id!, updatedActivity);
-          setState(() {
-            activities[index] = updatedActivity;
-          });
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Activity updated successfully')),
-            );
-          }
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error updating activity: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
+    if (result == 'delete') {
+      _deleteActivity(activity);
+    } else if (result is Activity) {
+      await _activityService.updateActivity(result);
+      await _loadActivities(); // รีโหลดกิจกรรมหลังจากอัปเดต
     }
+  }
+
+  void _deleteActivity(Activity activity) async {
+    try {
+      if (activity.id == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('ไม่พบ ID กิจกรรม'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      await _activityService.deleteActivity(activity.id!);
+      setState(() {
+        _activities.removeWhere((a) => a.id == activity.id);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('ลบกิจกรรมสำเร็จ'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('เกิดข้อผิดพลาดในการลบกิจกรรม: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Widget _buildEnhancedBottomNavBar() {
+    return BottomNavigationBar(
+      items: [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home),
+          label: 'Home',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.calendar_today),
+          label: 'Calendar',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.account_circle),
+          label: 'Account',
+        ),
+      ],
+      currentIndex: _currentIndex,
+      onTap: (index) {
+        setState(() {
+          _currentIndex = index; // ตรวจสอบว่า index อยู่ในช่วงที่ถูกต้อง
+        });
+      },
+    );
   }
 
   void _sortActivities() {
@@ -665,5 +2374,76 @@ class _CalendarPageState extends State<CalendarPage> {
           b.startTime.minute -
           (a.startTime.hour * 60 + a.startTime.minute);
     });
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return MotionTabBar(
+      labels: const ["Home", "Account", "Notes", "Calendar", "Groups"],
+      icons: const [
+        Icons.home,
+        Icons.person,
+        Icons.book,
+        Icons.calendar_today,
+        Icons.group
+      ],
+      initialSelectedTab: "Calendar",
+      tabIconColor: const Color(0xFF0C5217),
+      tabSelectedColor: Colors.green,
+      onTabItemSelected: (int index) {
+        switch (index) {
+          case 0: // Home
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HomePage(
+                  username: widget.username,
+                  userEmail: widget.userEmail,
+                ),
+              ),
+            );
+            break;
+
+          case 1: // Account
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AccountPage(
+                  initialUsername: widget.username,
+                  userEmail: widget.userEmail,
+                ),
+              ),
+            );
+            break;
+
+          case 2: // Notes
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => NotePage(
+                  username: widget.username,
+                  userEmail: widget.userEmail,
+                ),
+              ),
+            );
+            break;
+
+          case 3: // Calendar (ปัจจุบัน)
+            // ไม่ต้องทำอะไรเพราะอยู่ใน Calendar แล้ว
+            break;
+
+          case 4: // Groups
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => GroupPage(
+                  username: widget.username,
+                  userEmail: widget.userEmail,
+                ),
+              ),
+            );
+            break;
+        }
+      },
+    );
   }
 }
