@@ -18,12 +18,8 @@ class ChooseGroupImageScreen extends StatefulWidget {
 
 class _ChooseGroupImageScreenState extends State<ChooseGroupImageScreen> {
   final ImagePicker _picker = ImagePicker();
-
-  final List<String> defaultImages = [
-    'assets/group_images/default1.png',
-    'assets/group_images/default2.png',
-    'assets/group_images/default3.png',
-  ];
+  final List<String> defaultImages = List.generate(
+      13, (index) => 'assets/group_images/default${index + 1}.png');
 
   Future<void> _pickImage(ImageSource source) async {
     try {

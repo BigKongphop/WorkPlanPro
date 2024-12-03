@@ -76,9 +76,19 @@ flutter:
     - assets/animation/animation_login_3.json
     - assets/animation/loading.json
     - assets/group_images/
-    - assets/group_images/default1.png 
+    - assets/group_images/default1.png
     - assets/group_images/default2.png
     - assets/group_images/default3.png
+    - assets/group_images/default4.png
+    - assets/group_images/default5.png
+    - assets/group_images/default6.png
+    - assets/group_images/default7.png
+    - assets/group_images/default8.png
+    - assets/group_images/default9.png
+    - assets/group_images/default10.png
+    - assets/group_images/default11.png
+    - assets/group_images/default12.png
+    - assets/group_images/default13.png
 
     - assets/profile_images/default1.jpg
     - assets/profile_images/default2.jpg

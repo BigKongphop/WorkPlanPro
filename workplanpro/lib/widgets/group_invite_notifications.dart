@@ -45,7 +45,6 @@ class _NotificationWidgetState extends State<NotificationWidget> {
         });
       }
     } catch (e) {
-      print('Error loading invitations: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
