@@ -1,9 +1,39 @@
+import 'dart:io' show File;
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import './group_settings_screen.dart';
 import './group_calendar_page.dart';
 import '../widgets/group_member_tab.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path/path.dart' as path;
+import 'package:firebase_storage/firebase_storage.dart';
+
+extension FileExtension on File {
+  String get mimeType {
+    final ext = path.extension(this.path).toLowerCase();
+    switch (ext) {
+      case '.jpg':
+      case '.jpeg':
+        return 'image/jpeg';
+      case '.png':
+        return 'image/png';
+      case '.mp4':
+        return 'video/mp4';
+      case '.pdf':
+        return 'application/pdf';
+      case '.doc':
+      case '.docx':
+        return 'application/msword';
+      case '.xls':
+      case '.xlsx':
+        return 'application/vnd.ms-excel';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+}
 
 class GroupDetailScreen extends StatefulWidget {
   final String groupId;
@@ -24,7 +54,9 @@ class GroupDetailScreen extends StatefulWidget {
 class _GroupDetailScreenState extends State<GroupDetailScreen> {
   final TextEditingController _messageController = TextEditingController();
   bool isLoading = true;
+  bool _isUploading = false;
   bool _isAdmin = false;
+  final ImagePicker _imagePicker = ImagePicker();
   Map<String, dynamic>? groupData;
   List<Map<String, dynamic>> messages = [];
   int _selectedTabIndex = 0;
@@ -75,6 +107,47 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       }
     } catch (e) {
       print('Error checking admin status: $e');
+    }
+  }
+
+  Future<void> _uploadAndSendMedia(File file, String type) async {
+    try {
+      setState(() => _isUploading = true);
+
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final extension = path.extension(file.path);
+      final fileName = 'file_${timestamp}${extension}';
+
+      final storageRef =
+          FirebaseStorage.instance.ref().child('chats').child(fileName);
+
+      await storageRef.putFile(file);
+
+      final downloadUrl = await storageRef.getDownloadURL();
+
+      await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(widget.groupId)
+          .collection('messages')
+          .add({
+        'sender': widget.username,
+        'senderEmail': widget.userEmail,
+        'content': '',
+        'mediaUrl': downloadUrl,
+        'mediaType': type,
+        'fileName': fileName,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      setState(() => _isUploading = false);
+    } catch (e) {
+      print('Upload error: $e');
+      setState(() => _isUploading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading file: $e')),
+        );
+      }
     }
   }
 
@@ -199,6 +272,11 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           padding: const EdgeInsets.all(8.0),
           child: Row(
             children: [
+              // เพิ่มปุ่มแนบไฟล์
+              IconButton(
+                icon: Icon(Icons.attach_file),
+                onPressed: _showAttachmentOptions,
+              ),
               Expanded(
                 child: TextField(
                   controller: _messageController,
@@ -213,13 +291,15 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                 ),
               ),
               SizedBox(width: 8),
-              CircleAvatar(
-                backgroundColor: Color(0xFF0C5217),
-                child: IconButton(
-                  icon: Icon(Icons.send, color: Colors.white),
-                  onPressed: _sendMessage,
-                ),
-              ),
+              _isUploading
+                  ? CircularProgressIndicator()
+                  : CircleAvatar(
+                      backgroundColor: Color(0xFF0C5217),
+                      child: IconButton(
+                        icon: Icon(Icons.send, color: Colors.white),
+                        onPressed: _sendMessage,
+                      ),
+                    ),
             ],
           ),
         ),
@@ -347,6 +427,311 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                       ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (image != null) {
+        await _uploadAndSendMedia(File(image.path), 'image');
+      }
+    } catch (e) {
+      print('Error picking image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking image: $e')),
+        );
+      }
+    }
+  }
+
+  // เพิ่มเมธอดสำหรับเลือกและส่งวิดีโอ
+  Future<void> _pickVideo() async {
+    try {
+      final XFile? video = await _imagePicker.pickVideo(
+        source: ImageSource.gallery,
+        maxDuration: const Duration(minutes: 5),
+      );
+
+      if (video != null) {
+        // ตรวจสอบขนาดไฟล์ (จำกัดที่ 50MB)
+        final file = File(video.path);
+        final sizeInBytes = await file.length();
+        final sizeInMb = sizeInBytes / (1024 * 1024);
+
+        if (sizeInMb > 50) {
+          throw 'Video size must be less than 50MB';
+        }
+
+        await _uploadAndSendMedia(file, 'video');
+      }
+    } catch (e) {
+      print('Error picking video: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking video: $e')),
+        );
+      }
+    }
+  }
+
+  // เพิ่มเมธอดสำหรับเลือกและส่งไฟล์
+  Future<void> _pickFile() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        allowMultiple: false,
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx'],
+      );
+
+      if (result != null) {
+        final file = File(result.files.single.path!);
+
+        // ตรวจสอบขนาดไฟล์ (จำกัดที่ 10MB)
+        final sizeInBytes = await file.length();
+        final sizeInMb = sizeInBytes / (1024 * 1024);
+
+        if (sizeInMb > 10) {
+          throw 'File size must be less than 10MB';
+        }
+
+        await _uploadAndSendMedia(file, 'file');
+      }
+    } catch (e) {
+      print('Error picking file: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking file: $e')),
+        );
+      }
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  // แทนที่ส่วน build ของ Row ที่มีปุ่มส่งข้อความ
+  Widget _buildMessageInput() {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Row(
+        children: [
+          IconButton(
+            icon: Icon(Icons.attach_file),
+            onPressed: _showAttachmentOptions,
+          ),
+          Expanded(
+            child: TextField(
+              controller: _messageController,
+              decoration: InputDecoration(
+                hintText: 'Type a message',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              ),
+            ),
+          ),
+          SizedBox(width: 8),
+          _isUploading
+              ? CircularProgressIndicator()
+              : CircleAvatar(
+                  backgroundColor: Color(0xFF0C5217),
+                  child: IconButton(
+                    icon: Icon(Icons.send, color: Colors.white),
+                    onPressed: _sendMessage,
+                  ),
+                ),
+        ],
+      ),
+    );
+  }
+
+  void _showAttachmentOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.photo),
+              title: Text('Photo from Gallery'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(ImageSource.gallery);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.camera_alt),
+              title: Text('Take Photo'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImage(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.videocam),
+              title: Text('Video'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickVideo();
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.insert_drive_file),
+              title: Text('File'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickFile();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ปรับปรุงส่วนแสดงข้อความในแชท
+  Widget _buildMessageItem(
+      Map<String, dynamic> message, bool isMyMessage, DateTime date) {
+    return Align(
+      alignment: isMyMessage ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: EdgeInsets.only(
+          bottom: 8,
+          left: isMyMessage ? 50 : 0,
+          right: isMyMessage ? 0 : 50,
+        ),
+        padding: EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isMyMessage ? Color(0xFF0C5217) : Colors.grey[200],
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (!isMyMessage)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  message['sender'],
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ),
+            if (message['mediaUrl'] != null) ...[
+              _buildMediaPreview(message),
+              SizedBox(height: 8),
+            ],
+            if (message['content'].isNotEmpty)
+              Text(
+                message['content'],
+                style: TextStyle(
+                  color: isMyMessage ? Colors.white : Colors.black,
+                ),
+              ),
+            Text(
+              DateFormat('HH:mm').format(date),
+              style: TextStyle(
+                fontSize: 10,
+                color: isMyMessage ? Colors.white70 : Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMediaPreview(Map<String, dynamic> message) {
+    switch (message['mediaType']) {
+      case 'image':
+        return GestureDetector(
+          onTap: () => _showFullScreenImage(message['mediaUrl']),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.network(
+              message['mediaUrl'],
+              width: 200,
+              height: 200,
+              fit: BoxFit.cover,
+            ),
+          ),
+        );
+      case 'video':
+        return Container(
+          width: 200,
+          height: 150,
+          decoration: BoxDecoration(
+            color: Colors.black,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            Icons.play_circle_fill,
+            size: 50,
+            color: Colors.white,
+          ),
+        );
+      case 'file':
+        return Container(
+          padding: EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.insert_drive_file),
+              SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  message['fileName'] ?? 'File',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        );
+      default:
+        return SizedBox.shrink();
+    }
+  }
+
+  void _showFullScreenImage(String imageUrl) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            iconTheme: IconThemeData(color: Colors.white),
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              child: Image.network(imageUrl),
+            ),
+          ),
+          backgroundColor: Colors.black,
+        ),
       ),
     );
   }
