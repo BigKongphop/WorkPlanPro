@@ -127,7 +127,6 @@ class _GroupPageState extends State<GroupPage> {
       onDismissed: (direction) async {
         try {
           if (isCreator) {
-            // Delete the group
             await FirebaseFirestore.instance
                 .collection('groups')
                 .doc(group.id)
@@ -137,7 +136,6 @@ class _GroupPageState extends State<GroupPage> {
               const SnackBar(content: Text('Group deleted successfully')),
             );
           } else {
-            // Leave the group
             final List<String> memberEmails =
                 List<String>.from(data['memberEmails'] ?? []);
             memberEmails.remove(widget.userEmail);
@@ -264,16 +262,16 @@ class _GroupPageState extends State<GroupPage> {
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('ยืนยันการลบกลุ่ม'),
-        content: const Text('คุณต้องการลบกลุ่มนี้ใช่หรือไม่?'),
+        title: const Text('Confirm group deletion'),
+        content: const Text('Do you want to delete this group?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('ยกเลิก'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('ลบ', style: TextStyle(color: Colors.red)),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -369,7 +367,6 @@ class _GroupPageState extends State<GroupPage> {
                         final item = items.removeAt(oldIndex);
                         items.insert(newIndex, item);
 
-                        // Update orders for all affected items
                         for (var i = 0; i < items.length; i++) {
                           batch.update(items[i].reference, {'order': i});
                         }
@@ -412,18 +409,18 @@ class _GroupPageState extends State<GroupPage> {
 
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                    content: Text('ลบกลุ่มเรียบร้อยแล้ว')),
+                                    content: Text('Group successfully deleted')),
                               );
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                    content: Text('คุณไม่มีสิทธิ์ลบกลุ่มนี้')),
+                                    content: Text('You do not have permission to delete this group.')),
                               );
                             }
                           } catch (e) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                  content: Text('เกิดข้อผิดพลาดในการลบกลุ่ม')),
+                                  content: Text('An error occurred deleting the group.')),
                             );
                           }
                         },
@@ -527,7 +524,6 @@ class _GroupPageState extends State<GroupPage> {
             );
             break;
           case 4:
-            // Already in Group page
             break;
         }
       },

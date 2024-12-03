@@ -183,7 +183,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
 
       final batch = FirebaseFirestore.instance.batch();
 
-      // Remove member from members collection
       final memberQuery = await FirebaseFirestore.instance
           .collection('groups')
           .doc(widget.groupId)
@@ -195,7 +194,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
         batch.delete(memberQuery.docs.first.reference);
       }
 
-      // Update group document
       final groupRef =
           FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
       batch.update(groupRef, {
@@ -208,8 +206,8 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       setState(() => isLoading = false);
 
       if (mounted) {
-        Navigator.of(context).pop(); // Close settings
-        Navigator.of(context).pop(); // Return to group list
+        Navigator.of(context).pop();
+        Navigator.of(context).pop();
       }
     } catch (e) {
       setState(() => isLoading = false);
@@ -221,7 +219,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     try {
       setState(() => isLoading = true);
 
-      // Delete all members
       final membersSnapshot = await FirebaseFirestore.instance
           .collection('groups')
           .doc(widget.groupId)
@@ -234,13 +231,11 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
         batch.delete(doc.reference);
       }
 
-      // Delete group document
       batch.delete(
           FirebaseFirestore.instance.collection('groups').doc(widget.groupId));
 
       await batch.commit();
 
-      // Delete group image if exists
       if (currentGroupImage != null &&
           !currentGroupImage!.startsWith('assets/')) {
         try {
@@ -255,8 +250,8 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       setState(() => isLoading = false);
 
       if (mounted) {
-        Navigator.of(context).pop(); // Close settings
-        Navigator.of(context).pop(); // Return to group list
+        Navigator.of(context).pop();
+        Navigator.of(context).pop();
       }
     } catch (e) {
       setState(() => isLoading = false);
@@ -292,14 +287,12 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
             padding: EdgeInsets.all(16),
             children: [
               if (widget.isOwner) ...[
-                // Group Image Section
                 Container(
                   height: 200,
                   width: double.infinity,
                   decoration: BoxDecoration(
                     color: Colors.grey[200],
                     borderRadius: BorderRadius.circular(30),
-                    // Add a subtle border if needed
                     border: Border.all(
                       color: Colors.grey[300]!,
                       width: 1,
@@ -364,7 +357,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                 ),
                 SizedBox(height: 24),
 
-                // Group Info Section
                 Text(
                   'Group Information',
                   style: TextStyle(
@@ -403,7 +395,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                 ),
                 SizedBox(height: 32),
 
-                // Delete Group Option
                 Card(
                   color: Colors.red[50],
                   child: ListTile(

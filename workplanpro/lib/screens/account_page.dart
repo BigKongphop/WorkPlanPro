@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:motion_tab_bar_v2/motion-tab-bar.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:shimmer/shimmer.dart';
-
 import 'login_page.dart';
 import 'note_page.dart';
 import 'calendar_page.dart';
@@ -61,7 +60,7 @@ class _AccountPageState extends State<AccountPage>
     _loadUserData();
     _fetchUserActivities();
     _fetchUserNotifications();
-    _fetchUserGroups(); // Add this line
+    _fetchUserGroups();
   }
 
   Future<void> _loadUserData() async {
@@ -672,7 +671,6 @@ class _AccountPageState extends State<AccountPage>
             );
             break;
           case 1:
-            // Already in Account page
             break;
           case 2:
             Navigator.pushReplacement(

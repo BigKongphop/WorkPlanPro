@@ -5,7 +5,6 @@ import '../models/activity.dart';
 class ActivityDatabase {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // ดึงข้อมูลกิจกรรมของ user
   Future<List<Activity>> loadActivities(String username) async {
     try {
       final snapshot = await _firestore
@@ -36,10 +35,8 @@ class ActivityDatabase {
     }
   }
 
-  // บันทึกกิจกรรมใหม่
   Future<Activity> saveActivity(String username, Activity activity) async {
     try {
-      // เพิ่มข้อมูลใน Firestore และรับ DocumentReference กลับมา
       final docRef = await _firestore.collection('activities').add({
         'username': username,
         'title': activity.title,
@@ -52,7 +49,6 @@ class ActivityDatabase {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // สร้าง Activity ใหม่ที่มี id จาก Firestore
       return Activity(
         id: docRef.id,
         title: activity.title,
@@ -67,7 +63,6 @@ class ActivityDatabase {
     }
   }
 
-  // อัพเดทกิจกรรม
   Future<void> updateActivity(String docId, Activity activity) async {
     if (docId.isEmpty) {
       throw Exception('Document ID cannot be empty');
@@ -90,7 +85,6 @@ class ActivityDatabase {
     }
   }
 
-  // ลบกิจกรรม
   Future<void> deleteActivity(String docId) async {
     if (docId.isEmpty) {
       throw Exception('Document ID cannot be empty');

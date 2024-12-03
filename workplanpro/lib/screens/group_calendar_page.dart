@@ -57,7 +57,6 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
     try {
       setState(() => _isLoading = true);
 
-      // เจาะจงโหลดเฉพาะกิจกรรมของกลุ่มนี้
       final snapshot = await FirebaseFirestore.instance
           .collection('groups')
           .doc(widget.groupId)
@@ -109,7 +108,6 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
 
     if (result is Activity) {
       try {
-        // เพิ่มกิจกรรมในคอลเลกชัน activities ของกลุ่มนั้นๆ
         await FirebaseFirestore.instance
             .collection('groups')
             .doc(widget.groupId)
@@ -128,7 +126,7 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
           'createdBy': widget.currentUserEmail,
         });
 
-        _loadActivities(); // โหลดข้อมูลใหม่
+        _loadActivities();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -450,7 +448,6 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
       children: [
         Column(
           children: [
-            // Calendar Section
             Container(
               margin: EdgeInsets.fromLTRB(16, 16, 16, 0),
               padding: EdgeInsets.all(16),
@@ -467,7 +464,6 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
               ),
               child: Column(
                 children: [
-                  // Calendar Header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -517,7 +513,6 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
                     ],
                   ),
 
-                  // Calendar
                   TableCalendar(
                     firstDay: DateTime.utc(2010, 1, 1),
                     lastDay: DateTime.utc(2030, 12, 31),
@@ -574,7 +569,6 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
                     },
                   ),
 
-                  // Activities count
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Row(
@@ -611,7 +605,6 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
               ),
             ),
 
-            // Activities List Section
             Expanded(
               child: _buildActivitiesList(),
             ),

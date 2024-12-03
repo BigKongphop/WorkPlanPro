@@ -470,7 +470,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     }
   }
 
-  // เพิ่มเมธอดสำหรับเลือกและส่งวิดีโอ
   Future<void> _pickVideo() async {
     try {
       final XFile? video = await _imagePicker.pickVideo(
@@ -479,7 +478,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       );
 
       if (video != null) {
-        // ตรวจสอบขนาดไฟล์ (จำกัดที่ 50MB)
         final file = File(video.path);
         final sizeInBytes = await file.length();
         final sizeInMb = sizeInBytes / (1024 * 1024);
@@ -500,7 +498,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     }
   }
 
-  // เพิ่มเมธอดสำหรับเลือกและส่งไฟล์
   Future<void> _pickFile() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
@@ -512,7 +509,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       if (result != null) {
         final file = File(result.files.single.path!);
 
-        // ตรวจสอบขนาดไฟล์ (จำกัดที่ 10MB)
         final sizeInBytes = await file.length();
         final sizeInMb = sizeInBytes / (1024 * 1024);
 
@@ -653,7 +649,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     );
   }
 
-  // ปรับปรุงส่วนแสดงข้อความในแชท
   Widget _buildMessageItem(
       Map<String, dynamic> message, bool isMyMessage, DateTime date) {
     return Align(

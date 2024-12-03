@@ -22,7 +22,7 @@ class NoteDatabase {
       if (!await file.exists()) {
         return [];
       }
-      
+
       final contents = await file.readAsString();
       final List<dynamic> jsonList = json.decode(contents);
       return jsonList.map((json) => Note.fromJson(json)).toList();

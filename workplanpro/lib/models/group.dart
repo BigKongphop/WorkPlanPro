@@ -23,7 +23,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
     try {
       final firestore = FirebaseFirestore.instance;
-      
+
       final groupSnapshot = await firestore
           .collection('groups')
           .where('name', isEqualTo: _nameController.text)
@@ -54,7 +54,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
           .then((userDocs) {
         if (userDocs.docs.isNotEmpty) {
           final userDoc = userDocs.docs.first;
-          List<String> ownedGroups = List<String>.from(userDoc.data()['ownedGroups'] ?? []);
+          List<String> ownedGroups =
+              List<String>.from(userDoc.data()['ownedGroups'] ?? []);
           ownedGroups.add(docRef.id);
           userDoc.reference.update({'ownedGroups': ownedGroups});
         }
@@ -131,7 +132,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
               ),
               SizedBox(height: 32),
               if (_isLoading)
-                Center(child: CircularProgressIndicator(color: Color(0xFF0C5217)))
+                Center(
+                    child: CircularProgressIndicator(color: Color(0xFF0C5217)))
               else
                 SizedBox(
                   width: double.infinity,

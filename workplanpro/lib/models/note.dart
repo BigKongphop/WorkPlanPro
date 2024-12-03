@@ -24,7 +24,7 @@ class Note {
     return Note(
       date: json['date'] as String,
       title: json['title'] as String,
-      content: json['content'] as String, 
+      content: json['content'] as String,
       rating: json['rating'] as int,
     );
   }

@@ -3077,14 +3077,14 @@ class _EditProfilePageState extends State<EditProfilePage>
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: Text('ยืนยัน OTP'),
+        title: Text('Confirm OTP'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('รหัส OTP ถูกส่งไปที่เบอร์ $phoneNumber'),
+            Text('An OTP code has been sent to the number. $phoneNumber'),
             TextField(
               decoration: InputDecoration(
-                labelText: 'กรอกรหัส OTP',
+                labelText: 'Enter OTP code',
                 border: OutlineInputBorder(),
               ),
               keyboardType: TextInputType.number,

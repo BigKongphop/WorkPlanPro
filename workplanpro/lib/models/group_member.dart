@@ -1,9 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-
 class GroupMember {
   final String id;
-  final String username; 
+  final String username;
   final String role;
   final DateTime joinedAt;
 

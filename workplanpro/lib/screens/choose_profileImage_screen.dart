@@ -51,8 +51,7 @@ class _ChooseProfileImageScreenState extends State<ChooseProfileImageScreen> {
         title: const Text('Choose Profile Picture',
             style: TextStyle(color: Colors.white)),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back,
-              color: Colors.white), // Changed to white
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -99,13 +98,12 @@ class _ChooseProfileImageScreenState extends State<ChooseProfileImageScreen> {
                       await _saveProfileImage(imagePath);
 
                       if (mounted) {
-                        Navigator.pop(context); // Remove loading
-                        Navigator.pop(
-                            context, imagePath); // Return to previous screen
+                        Navigator.pop(context);
+                        Navigator.pop(context, imagePath);
                       }
                     } catch (e) {
                       if (mounted) {
-                        Navigator.pop(context); // Remove loading
+                        Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('Failed to save image')),
                         );

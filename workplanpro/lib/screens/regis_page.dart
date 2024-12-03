@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:ui';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebaseAuth;
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -20,7 +19,6 @@ class NetworkTimeout {
     try {
       return await operation().timeout(timeout);
     } on TimeoutException {
-      // Log timeout
       FirebaseCrashlytics.instance.recordError(
         TimeoutException(errorMessage),
         null,
@@ -28,7 +26,6 @@ class NetworkTimeout {
       );
       rethrow;
     } catch (e) {
-      // Log other errors
       FirebaseCrashlytics.instance.recordError(
         e,
         null,
@@ -62,15 +59,11 @@ class _RegisPageState extends State<RegisPage> {
   @override
   void initState() {
     super.initState();
-    // ตั้งค่า Global Error Handler
     FlutterError.onError = (FlutterErrorDetails details) {
-      // บันทึก Error
       _logError(details.exception, details.stack);
     };
 
-    // จัดการ Unhandled Errors
     PlatformDispatcher.instance.onError = (error, stackTrace) {
-      // บันทึก Error
       _logError(error, stackTrace);
       return true;
     };
@@ -78,29 +71,24 @@ class _RegisPageState extends State<RegisPage> {
   }
 
   void _setupComprehensiveErrorHandling() {
-    // จัดการ Error ระดับ Global
     FlutterError.onError = (FlutterErrorDetails details) {
       _handleGlobalError(details.exception, details.stack,
           errorContext: 'Registration Page Flutter Error');
     };
 
-    // จัดการ Unhandled Errors ใน Async Zone
     runZonedGuarded(() {
-      // Main app logic
     }, (error, stackTrace) {
       _handleGlobalError(error, stackTrace,
           errorContext: 'Registration Page Async Error');
     });
   }
 
-  // เมธอดจัดการ Error อย่างครอบคลุม
   void _handleGlobalError(
     dynamic error,
     StackTrace? stackTrace, {
-    String errorContext = 'Registration Page Async Error', // แก้ไขตรงนี้
+    String errorContext = 'Registration Page Async Error',
   }) {
     try {
-      // บันทึก Error ด้วย Crashlytics
       FirebaseCrashlytics.instance.recordError(
         error,
         stackTrace,
@@ -108,18 +96,14 @@ class _RegisPageState extends State<RegisPage> {
         fatal: false,
       );
 
-      // บันทึก Error ลง Log
       _logErrorToFile(error, stackTrace, errorContext);
 
-      // แสดง Error Dialog แบบปลอดภัย
       _showSafeErrorDialog(error, errorContext);
     } catch (e) {
-      // Fallback error handling
       print('Error handling failed: $e');
     }
   }
 
-  // บันทึก Error ลงไฟล์
   void _logErrorToFile(
       dynamic error, StackTrace? stackTrace, String errorContext) async {
     try {
@@ -140,15 +124,13 @@ class _RegisPageState extends State<RegisPage> {
     }
   }
 
-  // แสดง Error Dialog แบบปลอดภัย
   void _showSafeErrorDialog(dynamic error, String errorContext) {
     if (!mounted) return;
 
-    // แปลง Error เป็นข้อความที่เป็นมิตร
     String errorMessage = _getFriendlyErrorMessage(error, errorContext);
 
     showDialog(
-      context: context, // ใช้ context จาก State
+      context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text(
           'Registration Error',
@@ -158,8 +140,7 @@ class _RegisPageState extends State<RegisPage> {
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.of(dialogContext).pop(); // ใช้ dialogContext
-              // Optional: Perform recovery action
+              Navigator.of(dialogContext).pop();
               _attemptRecovery();
             },
             child: Text('OK'),
@@ -169,9 +150,7 @@ class _RegisPageState extends State<RegisPage> {
     );
   }
 
-  // แปลง Error เป็นข้อความที่เป็นมิตร
   String _getFriendlyErrorMessage(dynamic error, String context) {
-    // จัดการ Error ประเภทต่างๆ
     if (error is firebaseAuth.FirebaseAuthException) {
       return _getFirebaseAuthErrorMessage(error);
     }
@@ -184,11 +163,9 @@ class _RegisPageState extends State<RegisPage> {
       return 'Operation timed out. Please try again.';
     }
 
-    // Error ทั่วไป
     return 'An unexpected error occurred during $context. Please try again later.';
   }
 
-  // จัดการ Firebase Auth Error
   String _getFirebaseAuthErrorMessage(
       firebaseAuth.FirebaseAuthException error) {
     switch (error.code) {
@@ -207,26 +184,21 @@ class _RegisPageState extends State<RegisPage> {
     }
   }
 
-  // พยายามกู้คืนสถานะ
   void _attemptRecovery() {
     try {
-      // รีเซ็ตฟอร์มและล้างข้อมูล
       _resetRegistrationForm();
     } catch (e) {
       print('Recovery attempt failed: $e');
     }
   }
 
-  // รีเซ็ตฟอร์มการลงทะเบียน
   void _resetRegistrationForm() {
     setState(() {
-      // ล้างข้อมูลในฟอร์ม
       _usernameController.clear();
       _emailController.clear();
       _passwordController.clear();
       _confirmPasswordController.clear();
 
-      // รีเซ็ต Error state
       _usernameError = null;
       _emailError = null;
       _passwordError = null;
@@ -234,7 +206,6 @@ class _RegisPageState extends State<RegisPage> {
     });
   }
 
-  // เพิ่มการตรวจสอบเครือข่าย
   Future<bool> _checkNetworkConnectivity() async {
     final connectivityResult = await Connectivity().checkConnectivity();
     if (connectivityResult == ConnectivityResult.none) {
@@ -244,53 +215,41 @@ class _RegisPageState extends State<RegisPage> {
     return true;
   }
 
-  // เมธอดสำหรับบันทึก Error
   void _logError(dynamic error, StackTrace? stackTrace) {
     try {
-      // บันทึก Error ด้วย Firebase Crashlytics
       FirebaseCrashlytics.instance.recordError(
         error,
         stackTrace,
         fatal: false,
       );
 
-      // Log ด้วย Logger
       _logger.severe('Unhandled Error', error, stackTrace);
 
-      // แสดง Error Dialog
       _showErrorDialog(error.toString());
     } catch (e) {
       print('Error logging error: $e');
     }
   }
 
-  // การลงทะเบียนที่มีการตรวจสอบความปลอดภัย
   Future<void> _performRegistrationWithSafetyChecks() async {
     try {
-      // Create user
       final userCredential = await firebaseAuth.FirebaseAuth.instance
           .createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      // Check if user is created successfully
       final user = userCredential.user;
       if (user != null) {
-        // Send verification email
         await _sendVerificationEmail(user);
 
-        // Wait for email verification
         await _waitForEmailVerification(user);
       }
     } on firebaseAuth.FirebaseAuthException catch (e) {
-      // Handle Firebase Authentication errors
       _handleAuthError(e);
     } catch (e) {
-      // Show general error
       _showErrorSnackBar('Registration failed: ${e.toString()}');
     } finally {
-      // Ensure loading indicator is closed
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
@@ -312,24 +271,18 @@ class _RegisPageState extends State<RegisPage> {
         builder: (BuildContext dialogContext) {
           return StatefulBuilder(
             builder: (context, setState) {
-              // ฟังก์ชันตรวจสอบอีเมลและปิด Dialog
               Future<void> checkEmailVerification() async {
                 try {
                   if (!mounted) return;
 
-                  // รีโหลดข้อมูลผู้ใช้เพื่อตรวจสอบสถานะการยืนยันอีเมล
                   await user.reload();
 
-                  // ดึงข้อมูลผู้ใช้ล่าสุด
                   final currentUser =
                       firebaseAuth.FirebaseAuth.instance.currentUser;
 
-                  // ตรวจสอบว่าผู้ใช้ยังคงอยู่และอีเมลถูกยืนยันแล้ว
                   if (currentUser != null && currentUser.emailVerified) {
-                    // ยกเลิก Timer ก่อน
                     verificationTimer?.cancel();
 
-                    // ตรวจสอบว่า Dialog ยังเปิดอยู่และสามารถปิดได้
                     if (isDialogOpen && mounted) {
                       if (Navigator.of(dialogContext).canPop()) {
                         isDialogOpen = false;
@@ -337,7 +290,6 @@ class _RegisPageState extends State<RegisPage> {
                       }
                     }
 
-                    // แจ้งเตือนผู้ใช้
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
@@ -347,27 +299,22 @@ class _RegisPageState extends State<RegisPage> {
                       );
                     }
 
-                    // บันทึกข้อมูลผู้ใช้ลง Firestore
                     await _saveUserToFirestore(currentUser);
 
-                    // นำทางไปยังหน้าถัดไป
                     if (mounted) {
                       _navigateToNextScreen();
                     }
 
-                    // จบการทำงาน
                     if (!completer.isCompleted) {
                       completer.complete();
                     }
                   }
                 } catch (e) {
                   print('Error checking email verification: $e');
-                  // ในกรณีที่เกิดข้อผิดพลาด ให้ยกเลิก Timer
                   verificationTimer?.cancel();
                 }
               }
 
-              // สร้าง Timer สำหรับตรวจสอบการยืนยันอีเมล
               verificationTimer =
                   Timer.periodic(Duration(seconds: 3), (timer) async {
                 if (!mounted || !isDialogOpen) {
@@ -393,7 +340,6 @@ class _RegisPageState extends State<RegisPage> {
                     TextButton(
                       onPressed: () async {
                         try {
-                          // ยกเลิก Timer ก่อน
                           verificationTimer?.cancel();
 
                           isDialogOpen = false;
@@ -401,7 +347,6 @@ class _RegisPageState extends State<RegisPage> {
                             Navigator.of(dialogContext).pop();
                           }
 
-                          // ยกเลิกการลงทะเบียนอย่างปลอดภัย
                           if (user != null) {
                             await user.delete().timeout(
                               Duration(seconds: 5),
@@ -438,14 +383,12 @@ class _RegisPageState extends State<RegisPage> {
       );
     } catch (e) {
       print('Error in verification dialog: $e');
-      // ในกรณีที่เกิดข้อผิดพลาด ให้ยกเลิก Timer
       verificationTimer?.cancel();
 
       if (!completer.isCompleted) {
         completer.completeError(e);
       }
     } finally {
-      // ยกเลิก Timer เมื่อออกจากฟังก์ชัน
       verificationTimer?.cancel();
       isDialogOpen = false;
     }
@@ -454,52 +397,39 @@ class _RegisPageState extends State<RegisPage> {
   }
 
   Future<void> _performEmailVerificationCheck(firebaseAuth.User user) async {
-    // Attempt multiple verification checks
     for (int i = 0; i < 3; i++) {
       try {
-        // Reload user with force refresh
         await user.reload();
 
-        // Force token refresh
         await user.getIdToken(true);
 
-        // Additional Firebase check
         final tokenResult = await user.getIdTokenResult(true);
 
-        // Perform multiple checks
         if (user.emailVerified ||
             (tokenResult.claims?['email_verified'] == true)) {
-          // Close loading indicator
           if (Navigator.of(context).canPop()) {
             Navigator.of(context).pop();
           }
 
-          // Close verification dialog
           if (Navigator.of(context).canPop()) {
             Navigator.of(context).pop();
           }
 
-          // Save user to Firestore
           await _saveUserToFirestore(user);
 
-          // Navigate to next screen
           _navigateToNextScreen();
 
           return;
         }
 
-        // Wait before next attempt
         await Future.delayed(Duration(seconds: 3));
       } catch (e) {
         print('Verification attempt $i failed: $e');
 
-        // Wait before next attempt
         await Future.delayed(Duration(seconds: 2));
       }
     }
 
-    // If all attempts fail
-    // Close loading indicator
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     }
@@ -518,7 +448,7 @@ class _RegisPageState extends State<RegisPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text('OK'),
+            child: Text('Okay'),
           ),
         ],
       ),
@@ -532,10 +462,8 @@ class _RegisPageState extends State<RegisPage> {
     try {
       return await operation();
     } catch (e, stackTrace) {
-      // บันทึก Error
       _logError(e, stackTrace);
 
-      // แสดง Error Message
       _showErrorSnackBar(
         errorMessage ?? 'An unexpected error occurred: ${e.toString()}',
       );
@@ -553,16 +481,13 @@ class _RegisPageState extends State<RegisPage> {
   String? _validateUsernameRules(String value) {
     if (value.isEmpty) return 'Username is required';
 
-    // More comprehensive username validation
     if (value.length < 10) return 'Username must be at least 10 characters';
     if (value.length > 20) return 'Username must not exceed 20 characters';
 
-    // Check for allowed characters
     if (!RegExp(r'^[a-z0-9]+$').hasMatch(value)) {
       return 'Username can only contain lowercase letters and numbers';
     }
 
-    // Additional checks (e.g., prevent common usernames)
     final List<String> forbiddenUsernames = ['admin', 'root', 'user'];
     if (forbiddenUsernames.contains(value.toLowerCase())) {
       return 'This username is not allowed';
@@ -590,11 +515,9 @@ class _RegisPageState extends State<RegisPage> {
   String? _validatePasswordStrength(String value) {
     if (value.isEmpty) return 'Password is required';
 
-    // More detailed password strength check
     if (value.length < 10) return 'Password must be at least 10 characters';
     if (value.length > 20) return 'Password must not exceed 20 characters';
 
-    // แก้ไข RegExp ให้ถูกต้อง
     bool hasUppercase = value.contains(RegExp(r'[A-Z]'));
     bool hasLowercase = value.contains(RegExp(r'[a-z]'));
     bool hasDigits = value.contains(RegExp(r'[0-9]'));
@@ -616,34 +539,27 @@ class _RegisPageState extends State<RegisPage> {
   }
 
   Future<void> _register() async {
-    // ตรวจสอบ Form Validation ก่อน
     if (!_formKey.currentState!.validate()) {
       _showErrorSnackBar('Please correct the form errors');
       return;
     }
 
-    // ตรวจสอบความถูกต้องของข้อมูล
     if (!_validateAllFields()) {
       _showErrorSnackBar('Please check all fields');
       return;
     }
 
-    // ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต
     if (!await _checkNetworkConnectivity()) {
       return;
     }
 
     try {
-      // เพิ่ม Loading indicator
       _showLoadingIndicator();
 
-      // ดำเนินการลงทะเบียน
       await _performRegistrationWithSafetyChecks();
     } catch (e) {
-      // ซ่อน Loading indicator
       Navigator.of(context).pop();
 
-      // จัดการ Error
       _handleRegistrationError(e);
     }
   }
@@ -673,7 +589,6 @@ class _RegisPageState extends State<RegisPage> {
   void _navigateToNextScreen() {
     if (!mounted) return;
 
-    // ใช้ pushAndRemoveUntil แทน pushReplacement เพื่อล้าง stack ทั้งหมด
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => LoginPage()),
@@ -730,7 +645,6 @@ class _RegisPageState extends State<RegisPage> {
   }
 
   Future<void> _saveUserToFirestore(firebaseAuth.User user) async {
-    // Perform final verification check
     await user.reload();
 
     if (!user.emailVerified) {
@@ -768,9 +682,7 @@ class _RegisPageState extends State<RegisPage> {
 
   Future<void> _sendVerificationEmail(firebaseAuth.User user) async {
     try {
-      // Check if email is not verified
       if (!user.emailVerified) {
-        // Attempt to send verification email multiple times
         for (int i = 0; i < 3; i++) {
           try {
             await user.sendEmailVerification();
@@ -788,12 +700,10 @@ class _RegisPageState extends State<RegisPage> {
           } catch (sendError) {
             print('Email verification send attempt $i failed: $sendError');
 
-            // Wait before next attempt
             await Future.delayed(Duration(seconds: 2));
           }
         }
 
-        // If all send attempts fail
         _showErrorSnackBar(
             'Failed to send verification email. Please try again.');
       }
@@ -801,7 +711,6 @@ class _RegisPageState extends State<RegisPage> {
       _showErrorSnackBar(
           'Unexpected error sending verification email: ${e.toString()}');
 
-      // Optional: Delete user if email verification fails
       try {
         await user.delete();
       } catch (deleteError) {
@@ -969,7 +878,6 @@ class _RegisPageState extends State<RegisPage> {
 
   @override
   void dispose() {
-    // Dispose controllers
     _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();

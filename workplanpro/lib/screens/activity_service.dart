@@ -76,7 +76,6 @@ class ActivityService {
         throw AuthenticationException('User not authenticated');
       }
 
-      // Optional: Add ownership verification
       final activityDoc =
           await _firestore.collection('activities').doc(activityId).get();
       if (activityDoc.data()?['userId'] != user.uid) {
@@ -90,7 +89,6 @@ class ActivityService {
     }
   }
 
-// Sorting Activities
   List<Activity> sortActivities(List<Activity> activities, SortType sortType) {
     switch (sortType) {
       case SortType.nearestDate:
@@ -106,7 +104,6 @@ class ActivityService {
     }
   }
 
-  // Fetch Activities with Advanced Filtering
   Future<List<Activity>> fetchActivities({String? userId}) async {
     try {
       userId ??= FirebaseAuth.instance.currentUser?.uid;
@@ -128,7 +125,6 @@ class ActivityService {
     }
   }
 
-  // Sorting Activities
   List<Activity> _sortActivities(List<Activity> activities, SortType sortType) {
     final now = DateTime.now();
 
@@ -148,10 +144,8 @@ class ActivityService {
     }
   }
 
-  // Create Activity
   Future<Activity> createActivity(Activity activity) async {
     return handleActivityOperation(() async {
-      // Validate before creating
       if (!activity.validate()) {
         throw ValidationException('Invalid activity data');
       }
@@ -186,10 +180,8 @@ class ActivityService {
         activity.endTime != null;
   }
 
-  // Update Activity
   Future<void> updateActivity(Activity activity) async {
     try {
-      // Validate activity before updating
       if (activity.id == null) {
         throw Exception('Activity ID is required');
       }
@@ -198,7 +190,6 @@ class ActivityService {
         throw ValidationException('Invalid activity data');
       }
 
-      // Prepare data for Firestore update
       final activityData = {
         'title': activity.title,
         'description': activity.description,
@@ -217,33 +208,27 @@ class ActivityService {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      // Perform update
       await _firestore
           .collection('activities')
           .doc(activity.id)
           .update(activityData);
     } catch (e) {
-      // Rethrow to allow caller to handle
       rethrow;
     }
   }
 
-  // Delete Activity
   Future<void> deleteActivity(String activityId) async {
     try {
-      // ตรวจสอบว่ามี User ล็อกอินอยู่หรือไม่
       final user = _auth.currentUser;
       if (user == null) throw Exception('User not logged in');
 
-      // ลบกิจกรรมจาก Firestore
       await _firestore.collection('activities').doc(activityId).delete();
     } catch (e) {
       print('Error deleting activity: $e');
-      rethrow; // ส่งต่อข้อผิดพลาดเพื่อให้ผู้เรียกจัดการต่อ
+      rethrow;
     }
   }
 
-  // Advanced Filtering Method
   List<Activity> filterActivities(
     List<Activity> activities, {
     String? searchQuery,
@@ -260,7 +245,6 @@ class ActivityService {
       return matchesSearch && matchesType && matchesStatus;
     }).toList();
 
-    // Sorting
     filteredActivities.sort((a, b) {
       switch (sortType) {
         case SortType.nearestDate:
@@ -273,7 +257,7 @@ class ActivityService {
         case SortType.oldest:
           return a.date.compareTo(b.date);
         default:
-          return 0; // เพิ่มกรณีที่ไม่รู้จัก
+          return 0;
       }
     });
 

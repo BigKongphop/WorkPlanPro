@@ -1,7 +1,5 @@
-// safe_navigation_mixin.dart
 import 'dart:async';
 import 'dart:io';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -49,7 +47,7 @@ mixin SafeNavigationMixin<T extends StatefulWidget> on State<T> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('OK'),
+            child: Text('Okay'),
           ),
         ],
       ),
@@ -68,15 +66,15 @@ mixin SafeNavigationMixin<T extends StatefulWidget> on State<T> {
 
   // จัดการ Error อย่างครอบคลุม
   void handleError(dynamic error, {String? customMessage}) {
-    String errorMessage = customMessage ?? 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ';
+    String errorMessage = customMessage ?? 'An unknown error occurred.';
 
     // จำแนกประเภท Error
     if (error is FirebaseException) {
       errorMessage = _mapFirebaseError(error);
     } else if (error is TimeoutException) {
-      errorMessage = 'หมดเวลาการเชื่อมต่อ กรุณาลองใหม่อีกครั้ง';
+      errorMessage = 'Connection timed out Please try again.';
     } else if (error is SocketException) {
-      errorMessage = 'เกิดปัญหาการเชื่อมต่อเครือข่าย';
+      errorMessage = 'There was a network connection problem.';
     }
 
     // บันทึก Log หรือส่ง Error ไปยัง Error Tracking Service
@@ -84,7 +82,7 @@ mixin SafeNavigationMixin<T extends StatefulWidget> on State<T> {
 
     // แสดง Error Dialog หรือ SnackBar
     if (mounted) {
-      showErrorDialog('เกิดข้อผิดพลาด', errorMessage);
+      showErrorDialog('An error occurred.', errorMessage);
     }
   }
 
@@ -93,21 +91,21 @@ mixin SafeNavigationMixin<T extends StatefulWidget> on State<T> {
     // เพิ่ม FirebaseException
     switch (error.code) {
       case 'network-request-failed':
-        return 'การเชื่อมต่อเครือข่ายล้มเหลว';
+        return 'Network connection failed.';
       case 'permission-denied':
-        return 'ไม่มีสิทธิ์เข้าถึงข้อมูล';
+        return 'No access to data';
       case 'unavailable':
-        return 'บริการไม่พร้อมใช้งาน';
+        return 'Service unavailable';
       case 'invalid-credential':
-        return 'ข้อมูลประจำตัวไม่ถูกต้อง';
+        return 'Invalid credentials';
       case 'user-not-found':
-        return 'ไม่พบผู้ใช้';
+        return 'User not found';
       case 'wrong-password':
-        return 'รหัสผ่านไม่ถูกต้อง';
+        return 'The password is incorrect.';
       case 'too-many-requests':
-        return 'มีการร้องขอมากเกินไป กรุณาลองใหม่ภายหลัง';
+        return 'Too many requests Please try again later.';
       default:
-        return error.message ?? 'เกิดข้อผิดพลาดจาก Firebase';
+        return error.message ?? 'An error occurred from Firebase.';
     }
   }
 
@@ -122,7 +120,7 @@ mixin SafeNavigationMixin<T extends StatefulWidget> on State<T> {
     try {
       // ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต
       if (!await checkInternetConnection()) {
-        showSnackBar('ไม่มีการเชื่อมต่ออินเทอร์เน็ต', isError: true);
+        showSnackBar('No internet connection', isError: true);
         return;
       }
 
