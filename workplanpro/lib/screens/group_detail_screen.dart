@@ -120,9 +120,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
       final storageRef =
           FirebaseStorage.instance.ref().child('chats').child(fileName);
-
       await storageRef.putFile(file);
-
       final downloadUrl = await storageRef.getDownloadURL();
 
       await FirebaseFirestore.instance
@@ -191,7 +189,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       });
 
       _messageController.clear();
-      await _loadMessages();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -205,65 +202,43 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     return Column(
       children: [
         Expanded(
-          child: ListView.builder(
-            reverse: true,
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            itemCount: messages.length,
-            itemBuilder: (context, index) {
-              final message = messages[index];
-              final isMyMessage = message['senderEmail'] == widget.userEmail;
-              final date = (message['createdAt'] as Timestamp?)?.toDate() ??
-                  DateTime.now();
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('groups')
+                .doc(widget.groupId)
+                .collection('messages')
+                .orderBy('createdAt', descending: true)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(child: Text('Error: ${snapshot.error}'));
+              }
 
-              return Align(
-                alignment:
-                    isMyMessage ? Alignment.centerRight : Alignment.centerLeft,
-                child: Container(
-                  margin: EdgeInsets.only(
-                    bottom: 8,
-                    left: isMyMessage ? 50 : 0,
-                    right: isMyMessage ? 0 : 50,
-                  ),
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isMyMessage ? Color(0xFF0C5217) : Colors.grey[200],
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (!isMyMessage)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Text(
-                            message['sender'],
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ),
-                      Text(
-                        message['content'],
-                        style: TextStyle(
-                          color: isMyMessage ? Colors.white : Colors.black,
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          DateFormat('HH:mm').format(date),
-                          style: TextStyle(
-                            fontSize: 10,
-                            color:
-                                isMyMessage ? Colors.white70 : Colors.grey[600],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Center(child: CircularProgressIndicator());
+              }
+
+              final messages = snapshot.data?.docs.map((doc) {
+                    return {
+                      ...doc.data() as Map<String, dynamic>,
+                      'id': doc.id,
+                    };
+                  }).toList() ??
+                  [];
+
+              return ListView.builder(
+                reverse: true,
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                itemCount: messages.length,
+                itemBuilder: (context, index) {
+                  final message = messages[index];
+                  final isMyMessage =
+                      message['senderEmail'] == widget.userEmail;
+                  final date = (message['createdAt'] as Timestamp?)?.toDate() ??
+                      DateTime.now();
+
+                  return _buildMessageItem(message, isMyMessage, date);
+                },
               );
             },
           ),
@@ -272,7 +247,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           padding: const EdgeInsets.all(8.0),
           child: Row(
             children: [
-              // เพิ่มปุ่มแนบไฟล์
               IconButton(
                 icon: Icon(Icons.attach_file),
                 onPressed: _showAttachmentOptions,
@@ -333,24 +307,15 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '${data['name']} (${data['memberCount'] ?? 0})',
-                          style: TextStyle(color: Colors.white),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    '${data['name']} (${data['memberCount'] ?? 0})',
+                    style: TextStyle(color: Colors.white),
+                    overflow: TextOverflow.ellipsis,
                   ),
                   if (data['description']?.isNotEmpty ?? false)
                     Text(
                       data['description'],
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
                       overflow: TextOverflow.ellipsis,
                     ),
                 ],
@@ -648,11 +613,14 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                   color: isMyMessage ? Colors.white : Colors.black,
                 ),
               ),
-            Text(
-              DateFormat('HH:mm').format(date),
-              style: TextStyle(
-                fontSize: 10,
-                color: isMyMessage ? Colors.white70 : Colors.grey[600],
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                DateFormat('HH:mm').format(date),
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isMyMessage ? Colors.white70 : Colors.grey[600],
+                ),
               ),
             ),
           ],
