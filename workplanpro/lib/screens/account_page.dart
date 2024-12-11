@@ -27,12 +27,14 @@ class AccountPage extends StatefulWidget {
 
 class _AccountPageState extends State<AccountPage>
     with SingleTickerProviderStateMixin {
+  int _pendingInvitations = 0;
   int _currentIndex = 1;
   Map<String, dynamic> _userData = {};
   List<Map<String, dynamic>> _userActivities = [];
   List<Map<String, dynamic>> _userNotifications = [];
   List<Map<String, dynamic>> _userGroups = [];
   bool _isLoading = true;
+  
 
   final ThemeData appTheme = ThemeData(
     primarySwatch: Colors.green,
@@ -61,7 +63,26 @@ class _AccountPageState extends State<AccountPage>
     _fetchUserActivities();
     _fetchUserNotifications();
     _fetchUserGroups();
+    _fetchPendingInvitations();
   }
+
+  Future<void> _fetchPendingInvitations() async {
+  try {
+    final snapshot = await FirebaseFirestore.instance
+        .collectionGroup('members')
+        .where('email', isEqualTo: widget.userEmail)
+        .where('status', isEqualTo: 'pending')
+        .get();
+
+    if (mounted) {
+      setState(() {
+        _pendingInvitations = snapshot.docs.length;
+      });
+    }
+  } catch (e) {
+    print('Error fetching pending invitations: $e');
+  }
+}
 
   Future<void> _loadUserData() async {
     try {
@@ -170,7 +191,7 @@ class _AccountPageState extends State<AccountPage>
         children: [
           _buildStatItem('Activities', _userActivities.length.toString(),
               FontAwesomeIcons.chartLine),
-          _buildStatItem('Notifications', _userNotifications.length.toString(),
+          _buildStatItem('Notifications', _pendingInvitations.toString(),
               FontAwesomeIcons.bell),
           _buildStatItem(
               'Groups', _userGroups.length.toString(), FontAwesomeIcons.users),
