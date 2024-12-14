@@ -17,6 +17,40 @@ class ActivityService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  Stream<List<Activity>> getActivitiesStream(
+      {int limit = 50,
+      String? sortField = 'date',
+      DateTime? startDate,
+      DateTime? endDate}) {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw Exception('User not authenticated');
+    }
+
+    Query query = _firestore
+        .collection('activities')
+        .where('userId', isEqualTo: user.uid);
+
+    // เพิ่มเงื่อนไขการกรองช่วงเวลาที่ชัดเจนขึ้น
+    if (startDate != null && endDate != null) {
+      query = query.where('date',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+          isLessThanOrEqualTo: Timestamp.fromDate(endDate));
+    }
+
+    return query
+        .orderBy(sortField!,
+            descending: false) // เปลี่ยนเป็น false เพื่อเรียงลำดับถูกต้อง
+        .limit(limit)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Activity.fromFirestore(doc)).toList())
+        .handleError((error) {
+      print('Error fetching activities: $error');
+      return <Activity>[]; // ส่งคืนลิสต์ว่างหากเกิดข้อผิดพลาด
+    });
+  }
+
   Future<void> addActivity(Activity activity) async {
     try {
       final user = _auth.currentUser;
@@ -162,21 +196,79 @@ class ActivityService {
 
   Future<List<Activity>> fetchActivities({String? userId}) async {
     try {
-      userId ??= FirebaseAuth.instance.currentUser?.uid;
+      // Use current user's ID if not provided
+      userId ??= _auth.currentUser?.uid;
 
-      if (userId == null) throw AuthenticationException('No user logged in');
+      if (userId == null) {
+        throw AuthenticationException('No user logged in');
+      }
 
+      // Query activities for the specific user
       final querySnapshot = await _firestore
           .collection('activities')
           .where('userId', isEqualTo: userId)
-          .orderBy('date')
+          .orderBy('date', descending: false)
           .get();
 
-      return querySnapshot.docs
-          .map((doc) => Activity.fromMap({...doc.data(), 'id': doc.id}))
-          .toList();
+      // Convert documents to Activity objects
+      return querySnapshot.docs.map((doc) {
+        // Use the existing fromFirestore factory method
+        return Activity.fromFirestore(doc);
+      }).toList();
     } catch (e) {
-      print('Fetch Activities Error: $e');
+      print('Error fetching activities: $e');
+
+      // Return an empty list in case of error
+      return [];
+    }
+  }
+
+  Future<List<Activity>> fetchActivitiesWithFilters({
+    String? userId,
+    DateTime? startDate,
+    DateTime? endDate,
+    String? status,
+    String? type,
+  }) async {
+    try {
+      userId ??= _auth.currentUser?.uid;
+
+      if (userId == null) {
+        throw AuthenticationException('No user logged in');
+      }
+
+      Query query = _firestore
+          .collection('activities')
+          .where('userId', isEqualTo: userId);
+
+      // Add optional filters
+      if (startDate != null) {
+        query = query.where('date',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+      }
+
+      if (endDate != null) {
+        query = query.where('date',
+            isLessThanOrEqualTo: Timestamp.fromDate(endDate));
+      }
+
+      if (status != null) {
+        query = query.where('status', isEqualTo: status);
+      }
+
+      if (type != null) {
+        query = query.where('type', isEqualTo: type);
+      }
+
+      // Order and fetch
+      final querySnapshot =
+          await query.orderBy('date', descending: false).get();
+
+      return querySnapshot.docs.map((doc) {
+        return Activity.fromFirestore(doc);
+      }).toList();
+    } catch (e) {
+      print('Error fetching filtered activities: $e');
       return [];
     }
   }
@@ -301,6 +393,7 @@ class ActivityService {
       return matchesSearch && matchesType && matchesStatus;
     }).toList();
 
+    // Sort activities based on the specified sort type
     filteredActivities.sort((a, b) {
       switch (sortType) {
         case SortType.nearestDate:

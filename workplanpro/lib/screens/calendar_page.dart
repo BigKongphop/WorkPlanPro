@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -61,7 +63,10 @@ class Calendar extends StatelessWidget {
                 itemCount: 35,
                 itemBuilder: (context, index) {
                   int day = index + 1;
-                  bool isToday = day == 2; // Assuming today is the 2nd
+                  bool isToday = day == DateTime.now().day &&
+                      _currentMonth.month == DateTime.now().month &&
+                      _currentMonth.year ==
+                          DateTime.now().year; // ตรวจสอบวันปัจจุบัน
                   return Container(
                     decoration: BoxDecoration(
                       color: isToday ? Colors.green : Colors.transparent,
@@ -139,9 +144,15 @@ class _CalendarPageState extends State<CalendarPage> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
 
+  StreamSubscription? _activitiesSubscription;
+
+  // รับ User ID ปัจจุบัน
+  final String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
+  late Stream<List<Activity>> _activitiesStream;
   @override
   void initState() {
     super.initState();
+    _listenToActivities(); // เรียกใช้ฟังก์ชันเพื่อฟังการเปลี่ยนแปลงกิจกรรม
     _loadActivities().then((_) {
       setState(() {
         _selectedCategory = 'All'; // ตั้งค่าเริ่มต้นเป็น All
@@ -158,25 +169,78 @@ class _CalendarPageState extends State<CalendarPage> {
         ),
       );
     });
+    _initializeActivitiesStream();
+  }
+
+  void _initializeActivitiesStream() {
+    try {
+      _activitiesStream = ActivityService().getActivitiesStream(
+        startDate: DateTime.now().subtract(Duration(days: 30)),
+        endDate: DateTime.now().add(Duration(days: 365)),
+      );
+    } catch (e) {
+      print('Error initializing activities stream: $e');
+      // จัดการข้อผิดพลาดที่นี่
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Failed to load activities')));
+    }
+  }
+
+  void _listenToActivities() {
+    _activitiesSubscription?.cancel();
+
+    setState(() {
+      _isLoading = true;
+      _activities = [];
+    });
+
+    _activitiesSubscription = FirebaseFirestore.instance
+        .collection('activities')
+        .where('userId',
+            isEqualTo: currentUserId) // กรองเฉพาะกิจกรรมของผู้ใช้ปัจจุบัน
+        .snapshots()
+        .listen((snapshot) {
+      if (!mounted) return;
+
+      setState(() {
+        _activities = snapshot.docs.map((doc) {
+          final data = doc.data();
+          return Activity.fromFirestore(doc);
+        }).toList();
+
+        _filteredActivities = _filterActivities(); // กรองกิจกรรมใหม่
+        _isLoading = false; // ตั้งค่าเป็น false เมื่อโหลดเสร็จ
+      });
+    }, onError: (error) {
+      print('Error listening to activities: $error');
+      if (mounted) {
+        setState(() {
+          _isLoading = false; // ตั้งค่าเป็น false เมื่อเกิดข้อผิดพลาด
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    // ยกเลิก Listener เมื่อปิดหน้า เพื่อประหยัดทรัพยากร
+    _activitiesSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadActivities() async {
     try {
-      // Fetch activities for the current user
+      setState(() => _isLoading = true);
       final activities = await _activityService.fetchActivities();
-
       setState(() {
         _activities = activities;
-        _filteredActivities = _filterActivities();
+        _filteredActivities = _filterActivities(); // กรองกิจกรรมใหม่
+        _isLoading = false; // ตั้งค่าเป็น false เมื่อโหลดเสร็จ
       });
     } catch (e) {
       print('Error loading activities: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to load activities'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      setState(
+          () => _isLoading = false); // ตั้งค่าเป็น false เมื่อเกิดข้อผิดพลาด
     }
   }
 
@@ -1465,8 +1529,8 @@ class _CalendarPageState extends State<CalendarPage> {
 
   void _addNewActivity(Activity newActivity) {
     setState(() {
-      _activities.add(newActivity);
-      _filteredActivities = _filterActivities();
+      _activities.add(newActivity); // เพิ่มกิจกรรมใหม่
+      _filteredActivities = _filterActivities(); // กรองกิจกรรมใหม่
     });
   }
 
@@ -1487,8 +1551,18 @@ class _CalendarPageState extends State<CalendarPage> {
     });
   }
 
+  void _handleError(dynamic error) {
+    // แสดงข้อความข้อผิดพลาด
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Error loading activities: $error'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
   List<Activity> _getEventsForDay(DateTime day) {
-    return _activities.where((activity) {
+    return _filteredActivities.where((activity) {
       return activity.date.year == day.year &&
           activity.date.month == day.month &&
           activity.date.day == day.day;
@@ -1529,7 +1603,7 @@ class _CalendarPageState extends State<CalendarPage> {
               ),
               child: Column(
                 children: [
-                  // Handle untuk drag
+                  // Handle for dragging
                   Container(
                     width: 50,
                     height: 6,
@@ -1540,7 +1614,7 @@ class _CalendarPageState extends State<CalendarPage> {
                     ),
                   ),
 
-                  // Header วันที่
+                  // Header for the date
                   Padding(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 10),
@@ -1572,15 +1646,17 @@ class _CalendarPageState extends State<CalendarPage> {
                     endIndent: 16,
                   ),
 
-                  // Section Personal Activities
-                  _buildActivitySection(
-                      dayActivities, 'Personal Activities', 'Personal'),
+                  // Display daily activities
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: dayActivities.length,
+                      itemBuilder: (context, index) {
+                        return _buildActivityCard(dayActivities[index]);
+                      },
+                    ),
+                  ),
 
-                  // Section Group Activities
-                  _buildActivitySection(
-                      dayActivities, 'Group Activities', 'Group'),
-
-                  // Kondisi ketika tidak ada aktivitas
+                  // Condition when there are no activities
                   if (dayActivities.isEmpty)
                     Expanded(
                       child: Center(
@@ -1840,21 +1916,21 @@ class _CalendarPageState extends State<CalendarPage> {
     );
   }
 
-  Widget _buildActivitiesList(List<Activity> activities) {
+  Widget _buildActivitiesList() {
+    if (_isLoading) {
+      return Center(child: CircularProgressIndicator());
+    }
+
+    if (_filteredActivities.isEmpty) {
+      return Center(
+        child: Text('No activities found'),
+      );
+    }
+
     return ListView.builder(
-      itemCount: activities.length,
+      itemCount: _filteredActivities.length,
       itemBuilder: (context, index) {
-        final activity = activities[index];
-        return Card(
-          margin: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-          child: ListTile(
-            title: Text(activity.title),
-            subtitle: Text(DateFormat('dd MMM yyyy').format(activity.date)),
-            trailing: Text(activity.status),
-            onTap: () => _showActivityDetailsModal(activity, index,
-                activities),
-          ),
-        );
+        return _buildActivityCard(_filteredActivities[index]);
       },
     );
   }
@@ -2028,9 +2104,7 @@ class _CalendarPageState extends State<CalendarPage> {
 
   List<Activity> _filterActivities() {
     return _activities.where((activity) {
-      return _selectedCategory == 'All' ||
-          activity.type == _selectedCategory ||
-          (_selectedCategory == 'Group' && activity.type == 'Group');
+      return _selectedCategory == 'All' || activity.type == _selectedCategory;
     }).toList();
   }
 
@@ -2039,7 +2113,7 @@ class _CalendarPageState extends State<CalendarPage> {
       context,
       MaterialPageRoute(
         builder: (context) => AddActivityScreen(
-          initialType: ActivityType.Personal, // กำหนดเป็น Personal โดยอัตโนมัติ
+          initialType: ActivityType.Personal,
         ),
       ),
     );
@@ -2047,14 +2121,12 @@ class _CalendarPageState extends State<CalendarPage> {
     if (result is Activity) {
       try {
         // สร้าง Activity ใหม่
-        setState(() {
-          _activities.add(result);
-          _filteredActivities = _filterActivities();
-        });
+        await _activityService.addActivity(result); // เพิ่มกิจกรรมใหม่
+        await _loadActivities(); // โหลดกิจกรรมใหม่ทันที
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('An error occurred.: $e'),
+            content: Text('An error occurred: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -2455,6 +2527,7 @@ class _CalendarPageState extends State<CalendarPage> {
       await _activityService.deleteActivity(activity.id!);
       setState(() {
         _activities.removeWhere((a) => a.id == activity.id);
+        _filteredActivities = _filterActivities(); // อัปเดตกิจกรรมที่กรองใหม่
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2466,7 +2539,7 @@ class _CalendarPageState extends State<CalendarPage> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('An error occurred deleting an activity.: $e'),
+          content: Text('An error occurred deleting an activity: $e'),
           backgroundColor: Colors.red,
         ),
       );

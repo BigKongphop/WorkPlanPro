@@ -44,13 +44,14 @@ class Activity {
       'id': id,
       'title': title,
       'description': description,
-      'date': date.toIso8601String(),
-      'startTime': {'hour': startTime.hour, 'minute': startTime.minute},
-      'endTime': {'hour': endTime.hour, 'minute': endTime.minute},
+      'date': date,
+      'startTime': startTime,
+      'endTime': endTime,
       'type': type,
       'status': status,
+      'userId': userId,
+      'groupId': groupId,
       'priority': priority,
-      'userId': userId
     };
   }
 
@@ -95,75 +96,111 @@ class Activity {
   }
 
   // Create from Firestore Map
-  factory Activity.fromMap(Map<String, dynamic> map) {
+  factory Activity.fromFirestore(DocumentSnapshot doc) {
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+
     return Activity(
-        id: _safeConvert(map['id'], map['docId']),
-        title: _safeConvert(map['title'], ''),
-        description: _safeConvert(map['description'], ''),
-        date: _parseDate(_safeConvert(map['date'], DateTime.now())),
-        startTime: _parseTimeOfDay(_safeConvert(map['startTime'], null)),
-        endTime: _parseTimeOfDay(_safeConvert(map['endTime'], null)),
-        type: _safeConvert(map['type'], 'Personal'),
-        status: _safeConvert(map['status'], 'Pending'),
-        priority: _safeConvert(map['priority'], 'Low'),
-        userId: map['userId']);
+      id: doc.id,
+      title: data['title'] ?? '',
+      description: data['description'] ?? '',
+      date: (data['date'] as Timestamp).toDate(),
+      startTime: _parseTimeOfDay(data['startTime']),
+      endTime: _parseTimeOfDay(data['endTime']),
+      type: data['type'] ?? 'Personal',
+      status: data['status'] ?? 'Pending',
+      userId: data['userId'],
+      groupId: data['groupId'],
+      priority: data['priority'] ?? 'Low',
+    );
+  }
+// Method สำหรับแปลง Map เป็น Activity (เดิม)
+  static Activity fromMap(Map<String, dynamic> map) {
+    return Activity(
+      id: map['id'],
+      title: map['title'],
+      description: map['description'],
+      date: map['date'],
+      startTime: map['startTime'],
+      endTime: map['endTime'],
+      type: map['type'] ?? 'Personal',
+      status: map['status'] ?? 'Pending',
+      userId: map['userId'],
+      groupId: map['groupId'],
+      priority: map['priority'] ?? 'Low',
+    );
   }
 
   // Helper method to parse TimeOfDay
   static TimeOfDay _parseTimeOfDay(dynamic timeData) {
-    try {
-      if (timeData == null) return TimeOfDay.now();
+    if (timeData == null) return TimeOfDay.now();
 
-      if (timeData is Map) {
-        return TimeOfDay(
-            hour: _safeConvert(timeData['hour'], 0),
-            minute: _safeConvert(timeData['minute'], 0));
-      }
-
-      if (timeData is String) {
-        // กรณีเป็น String เช่น "14:30"
-        List<String> parts = timeData.split(':');
-        if (parts.length == 2) {
-          return TimeOfDay(
-              hour: int.parse(parts[0]), minute: int.parse(parts[1]));
-        }
-      }
-
-      return TimeOfDay.now();
-    } catch (e) {
-      print('Error parsing TimeOfDay: $e');
-      return TimeOfDay.now();
+    // ถ้า timeData เป็น Map
+    if (timeData is Map) {
+      return TimeOfDay(
+        hour: timeData['hour'] ?? 0,
+        minute: timeData['minute'] ?? 0,
+      );
     }
+
+    // ถ้า timeData เป็น String
+    if (timeData is String) {
+      final parts = timeData.split(':');
+      return TimeOfDay(
+        hour: int.parse(parts[0]),
+        minute: int.parse(parts[1]),
+      );
+    }
+
+    return TimeOfDay.now();
   }
 
   // Copy method for immutability
-  Activity copyWith(
-      {String? id,
-      String? title,
-      String? description,
-      DateTime? date,
-      TimeOfDay? startTime,
-      TimeOfDay? endTime,
-      String? type,
-      String? status,
-      String? priority,
-      String? userId}) {
+  Activity copyWith({
+    String? id,
+    String? title,
+    String? description,
+    DateTime? date,
+    TimeOfDay? startTime,
+    TimeOfDay? endTime,
+    String? type,
+    String? status,
+    String? userId,
+    String? groupId,
+    String? priority,
+  }) {
     return Activity(
-        id: id ?? this.id,
-        title: title ?? this.title,
-        description: description ?? this.description,
-        date: date ?? this.date,
-        startTime: startTime ?? this.startTime,
-        endTime: endTime ?? this.endTime,
-        type: type ?? this.type,
-        status: status ?? this.status,
-        priority: priority ?? this.priority,
-        userId: userId ?? this.userId);
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      date: date ?? this.date,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      type: type ?? this.type,
+      status: status ?? this.status,
+      userId: userId ?? this.userId,
+      groupId: groupId ?? this.groupId,
+      priority: priority ?? this.priority,
+    );
+  }
+
+  bool isValidActivity() {
+    return _validateBasicFields() &&
+        _validateTimeConstraints() &&
+        _validateOwnership();
+  }
+
+  bool _validateOwnership() {
+    // ตรวจสอบว่ามี userId และตรงกับผู้ใช้ปัจจุบัน
+    return userId != null && userId == FirebaseAuth.instance.currentUser?.uid;
   }
 
   // Validation method
   bool validate() {
-    return _validateBasicFields() && _validateTimeConstraints();
+    return title.isNotEmpty &&
+        description.isNotEmpty &&
+        date != null &&
+        startTime != null &&
+        endTime != null;
   }
 
   bool _validateBasicFields() {
@@ -187,15 +224,16 @@ class Activity {
 
   Map<String, dynamic> toFirestoreMap() {
     return {
-      'title': title.trim(),
-      'description': description.trim(),
+      'title': title,
+      'description': description,
       'date': Timestamp.fromDate(date),
       'startTime': {'hour': startTime.hour, 'minute': startTime.minute},
       'endTime': {'hour': endTime.hour, 'minute': endTime.minute},
       'type': type,
       'status': status,
+      'userId': userId,
+      'groupId': groupId,
       'priority': priority,
-      'userId': userId
     };
   }
 }
