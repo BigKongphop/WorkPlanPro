@@ -293,7 +293,7 @@ class _GroupCalendarPageState extends State<GroupCalendarPage> {
       final activityData = {
         ...activity.toFirestoreMap(),
         'groupId': widget.groupId,
-        'type': 'Group',
+        'type': 'Group', // กำหนดประเภทเป็น Group
         'createdAt': FieldValue.serverTimestamp(),
       };
 

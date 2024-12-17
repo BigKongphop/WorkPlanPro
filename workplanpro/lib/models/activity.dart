@@ -106,10 +106,11 @@ class Activity {
       date: (data['date'] as Timestamp).toDate(),
       startTime: _parseTimeOfDay(data['startTime']),
       endTime: _parseTimeOfDay(data['endTime']),
-      type: data['type'] ?? 'Personal',
+      type: data['type'] ?? (data['groupId'] != null ? 'Group' : 'Personal'),
       status: data['status'] ?? 'Pending',
       userId: data['userId'],
       groupId: data['groupId'],
+      isGroupActivity: data['isGroupActivity'] ?? (data['groupId'] != null),
       priority: data['priority'] ?? 'Low',
     );
   }

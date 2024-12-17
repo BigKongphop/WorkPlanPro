@@ -2113,24 +2113,17 @@ class _CalendarPageState extends State<CalendarPage> {
       context,
       MaterialPageRoute(
         builder: (context) => AddActivityScreen(
-          initialType: ActivityType.Personal,
+          initialType: ActivityType.Personal, // กำหนดเป็น Personal โดยอัตโนมัติ
         ),
       ),
     );
 
     if (result is Activity) {
-      try {
-        // สร้าง Activity ใหม่
-        await _activityService.addActivity(result); // เพิ่มกิจกรรมใหม่
-        await _loadActivities(); // โหลดกิจกรรมใหม่ทันที
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('An error occurred: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      // เพิ่มกิจกรรมใหม่
+      setState(() {
+        _activities.add(result); // result ตอนนี้เป็นประเภท ActivityModel
+        _filteredActivities = _filterActivities();
+      });
     }
   }
 

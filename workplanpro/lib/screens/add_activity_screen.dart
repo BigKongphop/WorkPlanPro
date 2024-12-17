@@ -12,6 +12,7 @@ class ActivityModel {
   final DateTime date;
   final String type;
   final String status;
+  final String? groupId; // เพิ่มฟิลด์นี้
 
   ActivityModel({
     required this.id,
@@ -20,6 +21,7 @@ class ActivityModel {
     required this.date,
     required this.type,
     this.status = 'Pending',
+    this.groupId, // เพิ่มฟิลด์นี้
   });
 
   // ฟังก์ชันสำหรับแปลง Activity เป็น ActivityModel
@@ -31,6 +33,7 @@ class ActivityModel {
       date: activity.date,
       type: activity.type,
       status: activity.status,
+      groupId: activity.groupId, // เพิ่มการดึง groupId
     );
   }
 }
@@ -112,10 +115,12 @@ class _AddActivityScreenState extends State<AddActivityScreen>
       date: _selectedDate,
       startTime: _startTime,
       endTime: _endTime,
-      type: _selectedType == ActivityType.Group ? 'Group' : 'Personal',
+      type: widget.groupId != null
+          ? 'Group'
+          : 'Personal', // ใช้ groupId เป็นเกณฑ์
       status: _selectedStatus,
       priority: _selectedPriority,
-      groupId: widget.groupId, // เพิ่ม groupId หากเป็น Group Activity
+      groupId: widget.groupId, // ส่ง groupId
     );
   }
 
@@ -740,74 +745,63 @@ class _AddActivityScreenState extends State<AddActivityScreen>
       if (widget.activityToEdit != null) {
         // UPDATE existing activity
         if (widget.groupId != null) {
-          // Update in group activities
-          final groupActivityRef = FirebaseFirestore.instance
-              .collection('groups')
-              .doc(widget.groupId)
-              .collection('activities')
-              .doc(widget.activityToEdit!.id);
+          // ดึงชื่อกลุ่ม
+          String groupName = '';
+          try {
+            final groupDoc = await FirebaseFirestore.instance
+                .collection('groups')
+                .doc(widget.groupId)
+                .get();
 
-          // Get the group name
-          final groupDoc = await FirebaseFirestore.instance
-              .collection('groups')
-              .doc(widget.groupId)
-              .get();
-          final groupData = groupDoc.data();
-          final groupName = groupData?['name'] ?? '';
+            groupName = groupDoc.data()?['name'] ?? 'Unnamed Group';
+          } catch (e) {
+            print('Error fetching group name: $e');
+            groupName = 'Unnamed Group';
+          }
 
           final activityData = {
             ...activity.toFirestoreMap(),
-            'groupId': widget.groupId,
+            'groupId': widget.groupId, // ใช้ groupId
             'groupName': groupName,
-            'isGroupActivity': true,
-            'updatedAt': FieldValue.serverTimestamp(),
+            'type':
+                widget.groupId != null ? 'Group' : 'Personal', // กำหนดประเภท
+            'isGroupActivity': widget.groupId != null,
+            'createdAt': FieldValue.serverTimestamp(),
           };
 
-          // Update in both collections using batch
-          WriteBatch batch = FirebaseFirestore.instance.batch();
-          batch.update(groupActivityRef, activityData);
-
-          // Find and update the corresponding activity in main collection
-          final mainActivityQuery = await FirebaseFirestore.instance
-              .collection('activities')
-              .where('groupId', isEqualTo: widget.groupId)
-              .where('date',
-                  isEqualTo: Timestamp.fromDate(widget.activityToEdit!.date))
-              .get();
-
-          for (var doc in mainActivityQuery.docs) {
-            final mainData = doc.data();
-            if (mainData['title'] == widget.activityToEdit!.title &&
-                mainData['description'] == widget.activityToEdit!.description) {
-              batch.update(doc.reference, activityData);
-            }
-          }
-
-          await batch.commit();
-        } else {
-          // Update personal activity
           await FirebaseFirestore.instance
               .collection('activities')
-              .doc(widget.activityToEdit!.id)
-              .update(activity.toFirestoreMap());
+              .add(activityData);
+        } else {
+          // Create personal activity
+          await FirebaseFirestore.instance
+              .collection('activities')
+              .add(activity.toFirestoreMap());
         }
       } else {
         // CREATE new activity
         if (widget.groupId != null) {
-          // Create in group activities
-          final groupDoc = await FirebaseFirestore.instance
-              .collection('groups')
-              .doc(widget.groupId)
-              .get();
+          // ดึงชื่อกลุ่ม
+          String groupName = '';
+          try {
+            final groupDoc = await FirebaseFirestore.instance
+                .collection('groups')
+                .doc(widget.groupId)
+                .get();
 
-          final groupData = groupDoc.data();
-          final groupName = groupData?['name'] ?? '';
+            groupName = groupDoc.data()?['name'] ?? 'Unnamed Group';
+          } catch (e) {
+            print('Error fetching group name: $e');
+            groupName = 'Unnamed Group';
+          }
 
           final activityData = {
             ...activity.toFirestoreMap(),
-            'groupId': widget.groupId,
+            'groupId': widget.groupId, // ใช้ groupId
             'groupName': groupName,
-            'isGroupActivity': true,
+            'type':
+                widget.groupId != null ? 'Group' : 'Personal', // กำหนดประเภท
+            'isGroupActivity': widget.groupId != null,
             'createdAt': FieldValue.serverTimestamp(),
           };
 
