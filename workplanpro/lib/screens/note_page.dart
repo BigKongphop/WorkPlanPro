@@ -8,6 +8,7 @@ import 'calendar_page.dart';
 import 'group_page.dart';
 import 'account_page.dart';
 import '../services/note_database.dart';
+import 'package:shimmer/shimmer.dart';
 
 class NotePage extends StatefulWidget {
   final String username;
@@ -156,23 +157,79 @@ class _NotePageState extends State<NotePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Color(0xFF0C5217),
-        title: Text(
-          'My Notes',
-          style: TextStyle(color: Colors.white),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.filter_list, color: Colors.white),
-            onPressed: _showFilterDialog,
+      backgroundColor: Colors.white,
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverAppBar(
+            expandedHeight: 180.0,
+            floating: false,
+            pinned: true,
+            flexibleSpace: FlexibleSpaceBar(
+              centerTitle: true,
+              title: Text(
+                'My Notes',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              background: _buildNotesHeader(),
+            ),
+            // Removed filter icon
           ),
         ],
+        body: _isLoading ? _buildLoadingState() : _buildNotesList(),
       ),
-      body: Column(
+      floatingActionButton: _buildFloatingActionButton(),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
+
+  Widget _buildFloatingActionButton() {
+    return FloatingActionButton.extended(
+      onPressed: () async {
+        final newNote = await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => CreateNoteScreen()),
+        );
+
+        if (newNote != null && newNote is Note) {
+          setState(() {
+            notes.insert(0, newNote);
+          });
+          await _noteDatabase.saveNotes(notes);
+        }
+      },
+      backgroundColor: Color(0xFF2C8C4B),
+      icon: Icon(Icons.add, color: Colors.white),
+      label: Text(
+        'New Note',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(Radius.circular(30.0)),
+      ),
+    );
+  }
+
+  Widget _buildNotesHeader() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF2C8C4B), Color(0xFF4CAF50)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: TextField(
               controller: _searchController,
               onChanged: (value) {
@@ -182,152 +239,112 @@ class _NotePageState extends State<NotePage> {
               },
               decoration: InputDecoration(
                 hintText: 'Search notes...',
-                prefixIcon: Icon(Icons.search),
+                hintStyle: TextStyle(color: Colors.white70),
+                prefixIcon: Icon(Icons.search, color: Colors.white),
+                fillColor: Colors.white24,
+                filled: true,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30.0),
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide.none,
                 ),
+              ),
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotesList() {
+    final filteredNotes = _getFilteredNotes();
+    return ListView.builder(
+      itemCount: filteredNotes.length,
+      itemBuilder: (context, index) {
+        final note = filteredNotes[index];
+        return _buildNoteCard(note, index);
+      },
+    );
+  }
+
+  Widget _buildNoteCard(Note note, int index) {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.green.shade50, Colors.green.shade100],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.shade200.withOpacity(0.5),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ListTile(
+        contentPadding: EdgeInsets.all(16),
+        title: Text(
+          note.title,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0C5217),
+            fontSize: 18,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(height: 8),
+            Text(
+              note.date,
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 14,
+              ),
+            ),
+            SizedBox(height: 8),
+            Row(
+              children: List.generate(3, (i) {
+                return Icon(
+                  i < note.rating ? Icons.star : Icons.star_border,
+                  color: i < note.rating ? Color(0xFF0C5217) : Colors.grey,
+                  size: 20,
+                );
+              }),
+            ),
+          ],
+        ),
+        trailing: Icon(
+          Icons.chevron_right,
+          color: Color(0xFF0C5217),
+        ),
+        onTap: () => _showNoteDetail(context, note, index),
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Shimmer.fromColors(
+            baseColor: Colors.green.shade200,
+            highlightColor: Colors.green.shade50,
+            child: Container(
+              width: 300,
+              height: 100,
+              decoration: BoxDecoration(
+                color: Colors.green.shade100,
+                borderRadius: BorderRadius.circular(15),
               ),
             ),
           ),
-          Expanded(
-            child: _isLoading
-                ? Center(
-                    child: CircularProgressIndicator(color: Color(0xFF0C5217)))
-                : ListView.builder(
-                    itemCount: _getFilteredNotes().length,
-                    itemBuilder: (context, index) {
-                      final note = _getFilteredNotes()[index];
-                      return GestureDetector(
-                        onTap: () => _showNoteDetail(context, note, index),
-                        child: Card(
-                          margin: EdgeInsets.all(8.0),
-                          child: Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(note.date,
-                                    style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold)),
-                                Text(note.title,
-                                    style: TextStyle(fontSize: 16)),
-                                SizedBox(height: 8.0),
-                                Row(
-                                  children: List.generate(3, (i) {
-                                    return Icon(
-                                      i < note.rating
-                                          ? Icons.star
-                                          : Icons.star_border,
-                                      size: 20,
-                                      color: i < note.rating
-                                          ? Color(0xFF0C5217)
-                                          : Colors.grey,
-                                    );
-                                  }),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final newNote = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => CreateNoteScreen()),
-          );
-
-          if (newNote != null && newNote is Note) {
-            setState(() {
-              notes.insert(0, newNote);
-            });
-            await _noteDatabase.saveNotes(notes);
-          }
-        },
-        backgroundColor: Color(0xFF0C5217),
-        icon: Icon(Icons.add, color: Colors.white),
-        label: Text(
-          'New Note',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(30.0)),
-        ),
-      ),
-      bottomNavigationBar: MotionTabBar(
-        labels: const ["Home", "Account", "Notes", "Calendar", "Groups"],
-        icons: const [
-          Icons.home,
-          Icons.person,
-          Icons.book,
-          Icons.calendar_today,
-          Icons.group
-        ],
-        initialSelectedTab: "Notes",
-        tabIconColor: const Color(0xFF0C5217),
-        tabSelectedColor: Colors.green,
-        onTabItemSelected: (int index) {
-          setState(() {
-            _currentIndex = index;
-          });
-          switch (index) {
-            case 0:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => HomePage(
-                    username: widget.username,
-                    userEmail: widget.userEmail,
-                  ),
-                ),
-              );
-              break;
-            case 1:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AccountPage(
-                    initialUsername: widget.username,
-                    userEmail: widget.userEmail,
-                  ),
-                ),
-              );
-              break;
-            case 2:
-              break;
-            case 3:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CalendarPage(
-                    username: widget.username,
-                    userEmail: widget.userEmail,
-                  ),
-                ),
-              );
-              break;
-            case 4:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => GroupPage(
-                    username: widget.username,
-                    userEmail: widget.userEmail,
-                  ),
-                ),
-              );
-              break;
-          }
-        },
       ),
     );
   }
@@ -476,6 +493,72 @@ class _NotePageState extends State<NotePage> {
             ),
           ],
         );
+      },
+    );
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return MotionTabBar(
+      labels: const ["Home", "Account", "Notes", "Calendar", "Groups"],
+      icons: const [
+        Icons.home,
+        Icons.person,
+        Icons.book,
+        Icons.calendar_today,
+        Icons.group
+      ],
+      initialSelectedTab: "Notes",
+      tabIconColor: const Color(0xFF0C5217),
+      tabSelectedColor: Colors.green,
+      onTabItemSelected: (int index) {
+        switch (index) {
+          case 0:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HomePage(
+                  username: widget.username,
+                  userEmail: widget.userEmail,
+                ),
+              ),
+            );
+            break;
+          case 1:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AccountPage(
+                  initialUsername: widget.username,
+                  userEmail: widget.userEmail,
+                ),
+              ),
+            );
+            break;
+          case 2:
+            break;
+          case 3:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CalendarPage(
+                  username: widget.username,
+                  userEmail: widget.userEmail,
+                ),
+              ),
+            );
+            break;
+          case 4:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => GroupPage(
+                  username: widget.username,
+                  userEmail: widget.userEmail,
+                ),
+              ),
+            );
+            break;
+        }
       },
     );
   }
