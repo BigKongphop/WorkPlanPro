@@ -325,15 +325,18 @@ class _GroupPageState extends State<GroupPage> {
               child: StreamBuilder<QuerySnapshot>(
                 stream: _groupsStream,
                 builder: (context, snapshot) {
+                  print('Stream data: ${snapshot.data?.docs.length} groups');
+
                   if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
+                    print('Error loading groups: ${snapshot.error}');
+                    return Center(child: Text('Error loading groups'));
                   }
 
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return Center(child: CircularProgressIndicator());
                   }
 
-                  final groups = _filterGroups(snapshot.data?.docs ?? []);
+                  final groups = snapshot.data?.docs ?? [];
 
                   if (groups.isEmpty) {
                     return Center(
@@ -409,18 +412,21 @@ class _GroupPageState extends State<GroupPage> {
 
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                    content: Text('Group successfully deleted')),
+                                    content:
+                                        Text('Group successfully deleted')),
                               );
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                    content: Text('You do not have permission to delete this group.')),
+                                    content: Text(
+                                        'You do not have permission to delete this group.')),
                               );
                             }
                           } catch (e) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
-                                  content: Text('An error occurred deleting the group.')),
+                                  content: Text(
+                                      'An error occurred deleting the group.')),
                             );
                           }
                         },

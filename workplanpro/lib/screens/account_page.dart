@@ -34,7 +34,6 @@ class _AccountPageState extends State<AccountPage>
   List<Map<String, dynamic>> _userNotifications = [];
   List<Map<String, dynamic>> _userGroups = [];
   bool _isLoading = true;
-  
 
   final ThemeData appTheme = ThemeData(
     primarySwatch: Colors.green,
@@ -67,22 +66,22 @@ class _AccountPageState extends State<AccountPage>
   }
 
   Future<void> _fetchPendingInvitations() async {
-  try {
-    final snapshot = await FirebaseFirestore.instance
-        .collectionGroup('members')
-        .where('email', isEqualTo: widget.userEmail)
-        .where('status', isEqualTo: 'pending')
-        .get();
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collectionGroup('members')
+          .where('email', isEqualTo: widget.userEmail)
+          .where('status', isEqualTo: 'pending')
+          .get();
 
-    if (mounted) {
-      setState(() {
-        _pendingInvitations = snapshot.docs.length;
-      });
+      if (mounted) {
+        setState(() {
+          _pendingInvitations = snapshot.docs.length;
+        });
+      }
+    } catch (e) {
+      print('Error fetching pending invitations: $e');
     }
-  } catch (e) {
-    print('Error fetching pending invitations: $e');
   }
-}
 
   Future<void> _loadUserData() async {
     try {
@@ -106,25 +105,23 @@ class _AccountPageState extends State<AccountPage>
     }
   }
 
+// ใน account_page.dart
   Future<void> _fetchUserGroups() async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final groupsSnapshot = await FirebaseFirestore.instance
-            .collectionGroup('members')
-            .where('email', isEqualTo: user.email)
-            .where('status', isEqualTo: 'accepted')
-            .get();
+      // ดึงกลุ่มที่มี email อยู่ใน memberEmails
+      final groupsSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .where('memberEmails', arrayContains: widget.userEmail)
+          .get();
 
-        setState(() {
-          _userGroups = groupsSnapshot.docs
-              .map((doc) => {
-                    'id': doc.reference.parent.parent?.id,
-                    'name': doc.reference.parent.parent?.parent.id,
-                  })
-              .toList();
-        });
-      }
+      setState(() {
+        _userGroups = groupsSnapshot.docs
+            .map((doc) => {
+                  'id': doc.id,
+                  'name': doc.data()['name'] ?? 'Unnamed Group',
+                })
+            .toList();
+      });
     } catch (e) {
       print('Error fetching groups: $e');
     }

@@ -177,12 +177,14 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     }
   }
 
+// ใน group_settings_screen.dart
   Future<void> _leaveGroup() async {
     try {
       setState(() => isLoading = true);
 
       final batch = FirebaseFirestore.instance.batch();
 
+      // 1. หา document ของ member ที่จะลบ
       final memberQuery = await FirebaseFirestore.instance
           .collection('groups')
           .doc(widget.groupId)
@@ -190,15 +192,18 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
           .where('email', isEqualTo: widget.currentUserEmail)
           .get();
 
+      // 2. ตรวจสอบและลบ member
       if (memberQuery.docs.isNotEmpty) {
         batch.delete(memberQuery.docs.first.reference);
       }
 
+      // 3. อัปเดตข้อมูลกลุ่ม - ลบ email ออกจาก memberEmails array และลด memberCount
       final groupRef =
           FirebaseFirestore.instance.collection('groups').doc(widget.groupId);
       batch.update(groupRef, {
         'memberCount': FieldValue.increment(-1),
-        'memberEmails': FieldValue.arrayRemove([widget.currentUserEmail])
+        'memberEmails':
+            FieldValue.arrayRemove([widget.currentUserEmail]) // เพิ่มบรรทัดนี้
       });
 
       await batch.commit();
@@ -356,7 +361,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                   ),
                 ),
                 SizedBox(height: 24),
-
                 Text(
                   'Group Information',
                   style: TextStyle(
@@ -394,7 +398,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                       style: TextStyle(color: Colors.white)),
                 ),
                 SizedBox(height: 32),
-
                 Card(
                   color: Colors.red[50],
                   child: ListTile(
