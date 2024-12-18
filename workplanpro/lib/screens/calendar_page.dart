@@ -1,5 +1,6 @@
-import 'dart:async';
+//calendar
 
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -149,14 +150,19 @@ class _CalendarPageState extends State<CalendarPage> {
   // รับ User ID ปัจจุบัน
   final String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
   late Stream<List<Activity>> _activitiesStream;
+
+  final _dayActivitiesController = StreamController<List<Activity>>.broadcast();
   @override
   void initState() {
     super.initState();
-    _listenToActivities(); // เรียกใช้ฟังก์ชันเพื่อฟังการเปลี่ยนแปลงกิจกรรม
+    _listenToActivities();
     _loadActivities().then((_) {
       setState(() {
-        _selectedCategory = 'All'; // ตั้งค่าเริ่มต้นเป็น All
-        _filteredActivities = _filterActivities(); // กรองกิจกรรมทันที
+        _selectedCategory = 'All';
+        _filteredActivities = _filterActivities();
+
+        // เพิ่มการเรียงลำดับกิจกรรม
+        _sortActivitiesByDate();
       });
     }).catchError((error) {
       setState(() {
@@ -170,6 +176,40 @@ class _CalendarPageState extends State<CalendarPage> {
       );
     });
     _initializeActivitiesStream();
+  } // เพิ่มเมธอดการเรียงลำดับกิจกรรม
+
+  Stream<List<Activity>> _getDayActivitiesStream(DateTime selectedDay) {
+    return FirebaseFirestore.instance
+        .collection('activities')
+        .where('userId', isEqualTo: currentUserId)
+        .where('date',
+            isGreaterThanOrEqualTo:
+                DateTime(selectedDay.year, selectedDay.month, selectedDay.day),
+            isLessThan: DateTime(
+                selectedDay.year, selectedDay.month, selectedDay.day + 1))
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Activity.fromFirestore(doc)).toList()
+              ..sort((a, b) =>
+                  a.startTime.hour * 60 +
+                  a.startTime.minute -
+                  (b.startTime.hour * 60 + b.startTime.minute)));
+  }
+
+  void _sortActivitiesByDate() {
+    _activities.sort((a, b) {
+      // เรียงตามวันที่ก่อน
+      int dateComparison = a.date.compareTo(b.date);
+      if (dateComparison != 0) return dateComparison;
+
+      // ถ้าวันเดียวกัน ให้เรียงตามเวลาเริ่มต้น
+      return a.startTime.hour * 60 +
+          a.startTime.minute -
+          (b.startTime.hour * 60 + b.startTime.minute);
+    });
+
+    // อัปเดต filtered activities หลังจากเรียงลำดับ
+    _filteredActivities = _filterActivities();
   }
 
   void _initializeActivitiesStream() {
@@ -290,62 +330,71 @@ class _CalendarPageState extends State<CalendarPage> {
 
   Widget _buildAnimatedActivityCard(Activity activity) {
     return AnimatedContainer(
-      duration: Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.shade300,
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ListTile(
-        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        leading: Container(
-          padding: EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: _getStatusColor(activity.status).withOpacity(0.2),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            _getIconForActivityType(activity.type),
-            color: _getStatusColor(activity.status),
-          ),
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.shade300,
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
         ),
-        title: Text(
-          activity.title,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF0C5217),
-          ),
-        ),
-        subtitle: Text(
-          '${activity.startTime.format(context)} - ${activity.endTime.format(context)}',
-          style: TextStyle(fontSize: 16.0),
-        ),
-        trailing: Container(
-          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: _getStatusColor(activity.status).withOpacity(0.2),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Text(
-            activity.status,
-            style: TextStyle(
+        child: ListTile(
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          leading: Container(
+            padding: EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: _getStatusColor(activity.status).withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.event, // Icon mặc định cho personal activity
               color: _getStatusColor(activity.status),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
             ),
           ),
-        ),
-        onTap: () => _showActivityDetailsModal(activity, 0, _activities),
-      ),
-    );
+          title: Text(
+            activity.title,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0C5217),
+            ),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${DateFormat('HH:mm').format(DateTime(2023, 1, 1, activity.startTime.hour, activity.startTime.minute))} - ${DateFormat('HH:mm').format(DateTime(2023, 1, 1, activity.endTime.hour, activity.endTime.minute))}',
+                style: TextStyle(fontSize: 14.0, color: Colors.grey.shade700),
+              ),
+              SizedBox(height: 4),
+              Text(
+                DateFormat('dd MMM yyyy').format(activity.date),
+                style: TextStyle(fontSize: 12.0, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+          trailing: Container(
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: _getStatusColor(activity.status).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              activity.status,
+              style: TextStyle(
+                color: _getStatusColor(activity.status),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          onTap: () => _showActivityDetails(activity),
+        ));
   }
 
   Color _getActivityTypeColor(String type) {
@@ -612,8 +661,6 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   void _showEnhancedDayActivities(DateTime selectedDay) {
-    final dayActivities = _getEventsForDay(selectedDay);
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -621,112 +668,263 @@ class _CalendarPageState extends State<CalendarPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(30.0)),
       ),
       builder: (context) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.7,
-          minChildSize: 0.4,
-          maxChildSize: 0.9,
-          expand: false,
-          builder: (context, scrollController) {
-            return Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.green.shade50, Colors.white],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(30.0)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 10,
-                    offset: Offset(0, -4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  // Handle untuk drag
-                  Container(
-                    width: 50,
-                    height: 6,
-                    margin: EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            // ฟังก์ชันโหลดกิจกรรมของวันที่เลือก
+            List<Activity> _loadDayActivities() {
+              return _activities.where((activity) {
+                return isSameDay(activity.date, selectedDay) &&
+                    activity.type == 'Personal' &&
+                    activity.userId == currentUserId;
+              }).toList()
+                ..sort((a, b) {
+                  return (a.startTime.hour * 60 + a.startTime.minute)
+                      .compareTo(b.startTime.hour * 60 + b.startTime.minute);
+                });
+            }
 
-                  // Header วันที่
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          DateFormat('EEEE, dd MMM yyyy').format(selectedDay),
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0C5217),
+            // โหลดกิจกรรมของวันที่เลือก
+            List<Activity> dayActivities = _loadDayActivities();
+
+            return DraggableScrollableSheet(
+              initialChildSize: 0.7,
+              minChildSize: 0.4,
+              maxChildSize: 0.9,
+              expand: false,
+              builder: (context, scrollController) {
+                return Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.green.shade50, Colors.white],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(30.0),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 10,
+                        offset: Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      // Drag Handle
+                      Container(
+                        width: 50,
+                        height: 6,
+                        margin: EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+
+                      // Date Header
+                      AnimatedContainer(
+                        duration: Duration(milliseconds: 300),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.green.shade100,
+                              Colors.green.shade50
+                            ],
                           ),
+                          borderRadius: BorderRadius.circular(15),
                         ),
-                        IconButton(
-                          icon: Icon(Icons.add_circle_outline,
-                              color: Color(0xFF0C5217)),
-                          onPressed: _navigateToAddActivity,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Divider
-                  Divider(
-                    color: Colors.grey.shade300,
-                    thickness: 1,
-                    indent: 16,
-                    endIndent: 16,
-                  ),
-
-                  // Section Personal Activities
-                  _buildActivitySection(
-                      dayActivities, 'Personal Activities', 'Personal'),
-
-                  // Section Group Activities
-                  _buildActivitySection(
-                      dayActivities, 'Group Activities', 'Group'),
-
-                  // Kondisi ketika tidak ada aktivitas
-                  if (dayActivities.isEmpty)
-                    Expanded(
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Icon(
-                              Icons.event_busy,
-                              size: 100,
-                              color: Colors.grey.shade300,
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  DateFormat('EEEE').format(selectedDay),
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: Colors.green.shade900,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  DateFormat('dd MMM yyyy').format(selectedDay),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.green.shade700,
+                                  ),
+                                ),
+                              ],
                             ),
-                            SizedBox(height: 16),
-                            Text(
-                              'No activities for this day',
-                              style: TextStyle(
-                                color: Colors.grey.shade500,
-                                fontSize: 18,
+                            IconButton(
+                              icon: Icon(
+                                Icons.add_circle,
+                                color: Colors.green.shade800,
+                                size: 30,
                               ),
+                              onPressed: () async {
+                                final result = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => AddActivityScreen(
+                                      initialType: ActivityType.Personal,
+                                      initialDate: selectedDay,
+                                    ),
+                                  ),
+                                );
+
+                                // หลังจากสร้างกิจกรรมใหม่
+                                if (result is Activity) {
+                                  // อัปเดต state ของ modal
+                                  setModalState(() {
+                                    // โหลดกิจกรรมใหม่
+                                    dayActivities = _loadDayActivities();
+                                  });
+
+                                  // อัปเดต state หลัก
+                                  setState(() {
+                                    _activities.add(result);
+                                    _filteredActivities = _filterActivities();
+                                  });
+                                }
+                              },
                             ),
                           ],
                         ),
                       ),
-                    ),
-                ],
-              ),
+
+                      // Activities List
+                      Expanded(
+                        child: dayActivities.isEmpty
+                            ? _buildEmptyStateWidget(selectedDay)
+                            : ListView.builder(
+                                controller: scrollController,
+                                itemCount: dayActivities.length,
+                                itemBuilder: (context, index) {
+                                  return Dismissible(
+                                    key: UniqueKey(), // เปลี่ยนเป็น UniqueKey
+                                    background: Container(color: Colors.red),
+                                    direction: DismissDirection.endToStart,
+                                    onDismissed: (direction) {
+                                      // ลบกิจกรรม
+                                      _deleteActivity(dayActivities[index]);
+
+                                      // อัปเดต state ของ modal
+                                      setModalState(() {
+                                        dayActivities.removeAt(index);
+                                      });
+
+                                      // อัปเดต state หลัก
+                                      setState(() {
+                                        _filteredActivities =
+                                            _filterActivities();
+                                      });
+                                    },
+                                    child: GestureDetector(
+                                      onTap: () async {
+                                        final editedActivity =
+                                            await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                AddActivityScreen(
+                                              activityToEdit:
+                                                  dayActivities[index],
+                                              initialDate:
+                                                  selectedDay, // เพิ่มบรรทัดนี้
+                                              initialType: ActivityType
+                                                  .Personal, // เพิ่มบรรทัดนี้
+                                            ),
+                                          ),
+                                        );
+
+                                        // หากมีการแก้ไขกิจกรรม
+                                        if (editedActivity is Activity) {
+                                          setModalState(() {
+                                            dayActivities =
+                                                _loadDayActivities();
+                                          });
+
+                                          setState(() {
+                                            _filteredActivities =
+                                                _filterActivities();
+                                          });
+                                        }
+                                      },
+                                      child: _buildEnhancedActivityCard(
+                                        dayActivities[index],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+                );
+              },
             );
           },
         );
       },
     );
+  }
+
+  Widget _buildEmptyStateWidget(DateTime selectedDay) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.calendar_today,
+            size: 80,
+            color: Colors.green.shade200,
+          ),
+          SizedBox(height: 16),
+          Text(
+            'No activities on ${DateFormat('dd MMM yyyy').format(selectedDay)}',
+            style: TextStyle(
+              color: Colors.green.shade700,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Tap the + button to add a new activity',
+            style: TextStyle(
+              color: Colors.green.shade400,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _navigateToAddActivityWithDate(DateTime selectedDay) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddActivityScreen(
+          initialType: ActivityType.Personal,
+          initialDate: selectedDay, // Pass the selected day here
+        ),
+      ),
+    );
+
+    if (result is Activity) {
+      setState(() {
+        _activities.add(result);
+        _filteredActivities = _filterActivities();
+        _sortActivitiesByDate();
+      });
+    }
   }
 
   Widget _buildCustomCalendarHeader() {
@@ -771,11 +969,13 @@ class _CalendarPageState extends State<CalendarPage> {
     return AnimatedContainer(
       duration: Duration(milliseconds: 300),
       decoration: BoxDecoration(
-        color: isToday ? Colors.green.shade100 : Colors.transparent,
+        color: isToday ? Colors.green.shade50 : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
-        border: events.isNotEmpty
-            ? Border.all(color: Colors.green.shade300, width: 1.5)
-            : null,
+        border: isToday
+            ? Border.all(color: Colors.green.shade700, width: 2)
+            : events.isNotEmpty
+                ? Border.all(color: Colors.green.shade200, width: 1.5)
+                : null,
       ),
       child: Center(
         child: Column(
@@ -793,7 +993,7 @@ class _CalendarPageState extends State<CalendarPage> {
                 fontSize: 14,
               ),
             ),
-            if (events.isNotEmpty)
+            if (events.isNotEmpty && !isToday)
               Container(
                 width: 5,
                 height: 5,
@@ -870,9 +1070,10 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   Widget _buildActivityIndicator() {
-    // Count activities for the current month
+    // Count only personal activities for the current month
     int monthActivities = _activities
         .where((activity) =>
+            activity.type == 'Personal' && // เพิ่มเงื่อนไขให้เป็นเฉพาะ Personal
             activity.date.year == _currentMonth.year &&
             activity.date.month == _currentMonth.month)
         .length;
@@ -883,7 +1084,7 @@ class _CalendarPageState extends State<CalendarPage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
-            'Activities this month',
+            'Personal Activities this month',
             style: TextStyle(
               color: Colors.green.shade800,
               fontWeight: FontWeight.w600,
@@ -896,7 +1097,6 @@ class _CalendarPageState extends State<CalendarPage> {
               borderRadius: BorderRadius.circular(15),
             ),
             child: Text(
-              // Added 'child' parameter here
               '$monthActivities',
               style: TextStyle(
                 color: Colors.green.shade800,
@@ -943,17 +1143,7 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   Widget _buildCategoryChips() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          children: ['All', 'Personal', 'Group']
-              .map((category) => _buildCategoryChip(category))
-              .toList(),
-        ),
-      ),
-    );
+    return Container(); // ไม่แสดง Category Chips
   }
 
   Widget _buildCategoryChip(String category) {
@@ -1018,54 +1208,43 @@ class _CalendarPageState extends State<CalendarPage> {
 
   Widget _buildEnhancedActivityCard(Activity activity) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.green.shade50, Colors.white],
+          colors: [Colors.white, Colors.green.shade50],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-            color: Colors.green.shade100.withOpacity(0.3),
-            spreadRadius: 1,
+            color: Colors.grey.shade300,
             blurRadius: 5,
-            offset: Offset(0, 3),
+            offset: Offset(0, 2),
           ),
         ],
       ),
       child: ListTile(
-        leading: Container(
-          padding: EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: _getStatusColor(activity.status).withOpacity(0.2),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            _getIconForActivityType(activity.type),
-            color: _getStatusColor(activity.status),
-          ),
-        ),
+        contentPadding: EdgeInsets.all(16),
         title: Text(
           activity.title,
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            color: Color(0xFF0C5217),
+            color: Colors.green.shade800,
           ),
         ),
         subtitle: Text(
-          DateFormat('dd MMM yyyy').format(activity.date),
-          style: TextStyle(color: Colors.grey.shade600),
-        ),
-        trailing: Chip(
-          label: Text(
-            activity.status,
-            style: TextStyle(color: Colors.white, fontSize: 12),
+          '${DateFormat('HH:mm').format(DateTime(2023, 1, 1, activity.startTime.hour, activity.startTime.minute))} - ${DateFormat('HH:mm').format(DateTime(2023, 1, 1, activity.endTime.hour, activity.endTime.minute))}',
+          style: TextStyle(
+            color: Colors.grey.shade700,
+            fontSize: 13,
           ),
-          backgroundColor: _getStatusColor(activity.status),
         ),
-        onTap: () => _showImprovedActivityDetails(activity),
+        trailing: Icon(
+          Icons.arrow_forward_ios,
+          color: Colors.green.shade600,
+        ),
+        onTap: () => _showActivityDetails(activity),
       ),
     );
   }
@@ -1385,15 +1564,16 @@ class _CalendarPageState extends State<CalendarPage> {
       BuildContext context, DateTime day, DateTime focusedDay) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.4),
+        color: Colors.green.shade700, // เปลี่ยนเป็นสีเขียวเข้ม
         shape: BoxShape.circle,
       ),
       child: Center(
         child: Text(
           '${day.day}',
           style: TextStyle(
-            color: Colors.white,
+            color: Colors.white, // คงสีขาวไว้
             fontWeight: FontWeight.bold,
+            fontSize: 16, // เพิ่มขนาดตัวเลข
           ),
         ),
       ),
@@ -1525,12 +1705,15 @@ class _CalendarPageState extends State<CalendarPage> {
         _removeActivity(result['activityId']);
         break;
     }
+
+    // เรียงลำดับกิจกรรมหลังจากมีการเปลี่ยนแปลง
+    _sortActivitiesByDate();
   }
 
   void _addNewActivity(Activity newActivity) {
     setState(() {
-      _activities.add(newActivity); // เพิ่มกิจกรรมใหม่
-      _filteredActivities = _filterActivities(); // กรองกิจกรรมใหม่
+      _activities.add(newActivity);
+      _sortActivitiesByDate(); // เรียงลำดับใหม่
     });
   }
 
@@ -1539,7 +1722,7 @@ class _CalendarPageState extends State<CalendarPage> {
       final index = _activities.indexWhere((a) => a.id == updatedActivity.id);
       if (index != -1) {
         _activities[index] = updatedActivity;
-        _filteredActivities = _filterActivities();
+        _sortActivitiesByDate(); // เรียงลำดับใหม่
       }
     });
   }
@@ -1563,7 +1746,9 @@ class _CalendarPageState extends State<CalendarPage> {
 
   List<Activity> _getEventsForDay(DateTime day) {
     return _filteredActivities.where((activity) {
-      return activity.date.year == day.year &&
+      return activity.type ==
+              'Personal' && // เพิ่มเงื่อนไขให้เป็นเฉพาะ Personal
+          activity.date.year == day.year &&
           activity.date.month == day.month &&
           activity.date.day == day.day;
     }).toList();
@@ -2035,7 +2220,7 @@ class _CalendarPageState extends State<CalendarPage> {
                       style: TextStyle(fontSize: 16.0),
                     ),
                     Text(
-                      'Time: ${activity.startTime.format(context)} - ${activity.endTime.format(context)}',
+                      'Time: ${DateFormat('HH:mm').format(DateTime(2023, 1, 1, activity.startTime.hour, activity.startTime.minute))} - ${DateFormat('HH:mm').format(DateTime(2023, 1, 1, activity.endTime.hour, activity.endTime.minute))}',
                       style: TextStyle(fontSize: 16.0),
                     ),
                     SizedBox(height: 16.0),
@@ -2104,7 +2289,7 @@ class _CalendarPageState extends State<CalendarPage> {
 
   List<Activity> _filterActivities() {
     return _activities.where((activity) {
-      return _selectedCategory == 'All' || activity.type == _selectedCategory;
+      return activity.type == 'Personal'; // แสดงเฉพาะกิจกรรมส่วนตัว
     }).toList();
   }
 
@@ -2119,9 +2304,8 @@ class _CalendarPageState extends State<CalendarPage> {
     );
 
     if (result is Activity) {
-      // เพิ่มกิจกรรมใหม่
       setState(() {
-        _activities.add(result); // result ตอนนี้เป็นประเภท ActivityModel
+        _activities.add(result);
         _filteredActivities = _filterActivities();
       });
     }
@@ -2314,45 +2498,255 @@ class _CalendarPageState extends State<CalendarPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
       ),
       builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                activity.title,
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.green.shade50, Colors.white],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(25.0),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 10,
+                    offset: Offset(0, -4),
+                  ),
+                ],
               ),
-              SizedBox(height: 10),
-              Text(
-                'Date: ${DateFormat('EEEE, MMM d, y').format(activity.date)}',
-                style: TextStyle(fontSize: 16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Drag Handle
+                  Center(
+                    child: Container(
+                      width: 50,
+                      height: 6,
+                      margin: EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                  ),
+
+                  // Header with Activity Title and Status
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            activity.title,
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green.shade900,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _getStatusColor(activity.status),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            activity.status,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Divider
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8.0,
+                    ),
+                    child: Divider(
+                      color: Colors.green.shade200,
+                      thickness: 1.5,
+                    ),
+                  ),
+
+                  // Details Section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildDetailRow(
+                          icon: Icons.calendar_today,
+                          label: 'Date',
+                          value: DateFormat('EEEE, dd MMM yyyy')
+                              .format(activity.date),
+                        ),
+                        SizedBox(height: 12),
+                        _buildDetailRow(
+                          icon: Icons.access_time,
+                          label: 'Time',
+                          value:
+                              '${DateFormat('HH:mm').format(DateTime(2023, 1, 1, activity.startTime.hour, activity.startTime.minute))} - ${DateFormat('HH:mm').format(DateTime(2023, 1, 1, activity.endTime.hour, activity.endTime.minute))}',
+                        ),
+                        SizedBox(height: 12),
+                        _buildDetailRow(
+                          icon: Icons.category,
+                          label: 'Type',
+                          value: activity.type,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Description Section
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Description',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green.shade900,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          activity.description.isEmpty
+                              ? 'No description provided'
+                              : activity.description,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: activity.description.isEmpty
+                                ? Colors.grey
+                                : Colors.black87,
+                            fontStyle: activity.description.isEmpty
+                                ? FontStyle.italic
+                                : FontStyle.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Action Buttons
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8.0,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _editActivity(activity);
+                            },
+                            icon: Icon(Icons.edit),
+                            label: Text('Edit'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green.shade600,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _deleteActivity(activity);
+                            },
+                            icon: Icon(Icons.delete),
+                            label: Text('Delete'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red.shade600,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                'Time: ${activity.startTime.format(context)} - ${activity.endTime.format(context)}',
-                style: TextStyle(fontSize: 16.0),
-              ),
-              SizedBox(height: 16.0),
-              Text(
-                'Description:',
-                style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.bold),
-              ),
-              Text(
-                activity.description,
-                style: TextStyle(fontSize: 16.0),
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _editActivity(activity);
-                },
-                child: Text('Edit Activity'),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
+    );
+  }
+
+  Widget _buildDetailRow({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.green.shade100,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            icon,
+            color: Colors.green.shade700,
+            size: 20,
+          ),
+        ),
+        SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.green.shade900,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -2420,7 +2814,7 @@ class _CalendarPageState extends State<CalendarPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                DateFormat('dd MMMM yyyy').format(activity.date),
+                '${DateFormat('HH:mm').format(DateTime(2023, 1, 1, activity.startTime.hour, activity.startTime.minute))} - ${DateFormat('HH:mm').format(DateTime(2023, 1, 1, activity.endTime.hour, activity.endTime.minute))}',
                 style: TextStyle(color: Colors.grey.shade600),
               ),
               Chip(
@@ -2448,59 +2842,36 @@ class _CalendarPageState extends State<CalendarPage> {
 
     if (result is Activity) {
       try {
-        WriteBatch batch = FirebaseFirestore.instance.batch();
+        // อัปเดตกิจกรรมในฐานข้อมูล
+        await _activityService.updateActivity(result);
 
-        // 1. อัปเดตใน main activities collection
-        await FirebaseFirestore.instance
-            .collection('activities')
-            .doc(activity.id)
-            .update(result.toFirestoreMap());
-
-        // 2. ถ้าเป็น group activity ให้อัปเดตใน group activities ด้วย
-        if (activity.groupId != null) {
-          // ค้นหา activity ใน group collection
-          final groupActivityQuery = await FirebaseFirestore.instance
-              .collection('groups')
-              .doc(activity.groupId)
-              .collection('activities')
-              .where('date', isEqualTo: Timestamp.fromDate(activity.date))
-              .where('title', isEqualTo: activity.title)
-              .get();
-
-          // อัปเดตทุก activity ที่ตรงกัน
-          for (var doc in groupActivityQuery.docs) {
-            batch.update(doc.reference, {
-              ...result.toFirestoreMap(),
-              'groupId': activity.groupId,
-              'isGroupActivity': true,
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
+        // อัปเดตรายการกิจกรรมในแอพ
+        setState(() {
+          // ค้นหาและแทนที่กิจกรรมเดิมด้วยกิจกรรมที่แก้ไข
+          int index = _activities.indexWhere((a) => a.id == result.id);
+          if (index != -1) {
+            _activities[index] = result;
           }
 
-          await batch.commit();
-        }
+          // อัปเดต filtered activities
+          _filteredActivities = _filterActivities();
+        });
 
-        // รีโหลดข้อมูลหลังจากอัปเดต
-        await _loadActivities();
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Activity updated successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
+        // แสดง Snackbar แจ้งผลสำเร็จ
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Activity updated successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
       } catch (e) {
         print('Error updating activity: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error updating activity: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating activity: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }

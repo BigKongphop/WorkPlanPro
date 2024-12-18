@@ -44,6 +44,7 @@ class AddActivityScreen extends StatefulWidget {
   final String? groupId;
   final String? activityType;
   final ActivityType? initialType;
+  final DateTime? initialDate;
 
   const AddActivityScreen({
     Key? key,
@@ -52,6 +53,7 @@ class AddActivityScreen extends StatefulWidget {
     this.groupId,
     this.activityType,
     this.initialType = ActivityType.Personal,
+    this.initialDate,
   }) : super(key: key);
 
   @override
@@ -80,22 +82,44 @@ class _AddActivityScreenState extends State<AddActivityScreen>
   void initState() {
     super.initState();
     _selectedType = widget.initialType!;
+
+    // กำหนดวันที่เริ่มต้น
+    if (widget.activityToEdit != null) {
+      // ใช้วันที่ของกิจกรรมที่กำลังแก้ไขโดยตรง
+      _selectedDate = widget.activityToEdit!.date;
+      _startTime = widget.activityToEdit!.startTime;
+      _endTime = widget.activityToEdit!.endTime;
+    } else if (widget.initialDate != null) {
+      // ถ้ามี initialDate ให้ใช้ initialDate
+      _selectedDate = widget.initialDate!;
+      _startTime = TimeOfDay.now();
+      _endTime = TimeOfDay(
+          hour: (_startTime.hour + 1) % 24, minute: _startTime.minute);
+    } else {
+      // ถ้าไม่มีทั้งสองอย่าง ใช้วันปัจจุบัน
+      _selectedDate = DateTime.now();
+      _startTime = TimeOfDay.now();
+      _endTime = TimeOfDay(
+          hour: (_startTime.hour + 1) % 24, minute: _startTime.minute);
+    }
+
+    // เพิ่มโค้ดนี้เพื่อให้แน่ใจว่าใช้วันที่จากกิจกรรมที่แก้ไข
+    if (widget.activityToEdit != null) {
+      _selectedDate = widget.activityToEdit!.date;
+    }
+
     _initializeControllers();
     _titleController =
         TextEditingController(text: widget.activityToEdit?.title ?? '');
     _descriptionController =
         TextEditingController(text: widget.activityToEdit?.description ?? '');
-    _selectedDate = widget.activityToEdit?.date ?? DateTime.now();
-    _startTime = widget.activityToEdit?.startTime ?? TimeOfDay.now();
-    _endTime = widget.activityToEdit?.endTime ??
-        TimeOfDay(hour: (_startTime.hour + 1) % 24, minute: _startTime.minute);
-    // Setup Animation Controller
+
+    // Setup Animation Controller และส่วนอื่นๆ คงเดิม
     _animationController = AnimationController(
       duration: Duration(milliseconds: 500),
-      vsync: this, // 'this' now correctly refers to TickerProvider
+      vsync: this,
     );
 
-    // Create animations
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
         CurvedAnimation(parent: _animationController, curve: Curves.easeInOut));
 
@@ -103,7 +127,6 @@ class _AddActivityScreenState extends State<AddActivityScreen>
         .animate(CurvedAnimation(
             parent: _animationController, curve: Curves.easeOutQuad));
 
-    // Start the animation
     _animationController.forward();
   }
 
@@ -155,25 +178,22 @@ class _AddActivityScreenState extends State<AddActivityScreen>
   }
 
   void _initializeControllers() {
-    _selectedDate = widget.activityToEdit?.date ?? DateTime.now();
-    if (_selectedDate.isBefore(DateTime.now())) {
-      _selectedDate = DateTime.now(); // ปรับให้เป็นวันที่ปัจจุบันถ้าเป็นอดีต
+    if (widget.activityToEdit != null) {
+      // ใช้ค่าจากกิจกรรมที่กำลังแก้ไข
+      _selectedDate = widget.activityToEdit!.date;
+      _startTime = widget.activityToEdit!.startTime;
+      _endTime = widget.activityToEdit!.endTime;
+      _selectedPriority = widget.activityToEdit!.priority ?? 'Low';
+      _selectedStatus = widget.activityToEdit!.status ?? 'Pending';
+    } else {
+      // ค่าเริ่มต้นสำหรับการสร้างกิจกรรมใหม่
+      _selectedDate = widget.initialDate ?? DateTime.now();
+      _startTime = TimeOfDay.now();
+      _endTime = TimeOfDay(
+          hour: (_startTime.hour + 1) % 24, minute: _startTime.minute);
+      _selectedPriority = 'Low';
+      _selectedStatus = 'Pending';
     }
-    // Initialize text controllers
-    _titleController =
-        TextEditingController(text: widget.activityToEdit?.title ?? '');
-    _descriptionController =
-        TextEditingController(text: widget.activityToEdit?.description ?? '');
-
-    // Initialize date and time
-    _selectedDate = widget.activityToEdit?.date ?? DateTime.now();
-    _startTime = widget.activityToEdit?.startTime ?? TimeOfDay.now();
-    _endTime = widget.activityToEdit?.endTime ??
-        TimeOfDay(hour: (_startTime.hour + 1) % 24, minute: _startTime.minute);
-
-    // Initialize other fields
-    _selectedPriority = widget.activityToEdit?.priority ?? 'Low';
-    _selectedStatus = widget.activityToEdit?.status ?? 'Pending';
   }
 
   @override
@@ -540,7 +560,10 @@ class _AddActivityScreenState extends State<AddActivityScreen>
           labelText: label,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         ),
-        child: Text(time.format(context)),
+        child: Text(
+          // ใช้ format 24 ชั่วโมง
+          '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+        ),
       ),
     );
   }
@@ -761,22 +784,39 @@ class _AddActivityScreenState extends State<AddActivityScreen>
 
           final activityData = {
             ...activity.toFirestoreMap(),
-            'groupId': widget.groupId, // ใช้ groupId
+            'groupId': widget.groupId,
             'groupName': groupName,
-            'type':
-                widget.groupId != null ? 'Group' : 'Personal', // กำหนดประเภท
+            'type': widget.groupId != null ? 'Group' : 'Personal',
             'isGroupActivity': widget.groupId != null,
-            'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
           };
 
+          // อัปเดตกิจกรรมในคอลเลคชัน activities
           await FirebaseFirestore.instance
               .collection('activities')
-              .add(activityData);
+              .doc(widget.activityToEdit!.id)
+              .update(activityData);
+
+          // ถ้ามี groupId ให้อัปเดตใน group activities ด้วย
+          if (widget.groupId != null) {
+            await FirebaseFirestore.instance
+                .collection('groups')
+                .doc(widget.groupId)
+                .collection('activities')
+                .where('id', isEqualTo: widget.activityToEdit!.id)
+                .get()
+                .then((querySnapshot) {
+              querySnapshot.docs.forEach((doc) {
+                doc.reference.update(activityData);
+              });
+            });
+          }
         } else {
-          // Create personal activity
+          // อัปเดตกิจกรรมส่วนตัว
           await FirebaseFirestore.instance
               .collection('activities')
-              .add(activity.toFirestoreMap());
+              .doc(widget.activityToEdit!.id)
+              .update(activity.toFirestoreMap());
         }
       } else {
         // CREATE new activity
@@ -797,23 +837,27 @@ class _AddActivityScreenState extends State<AddActivityScreen>
 
           final activityData = {
             ...activity.toFirestoreMap(),
-            'groupId': widget.groupId, // ใช้ groupId
+            'groupId': widget.groupId,
             'groupName': groupName,
-            'type':
-                widget.groupId != null ? 'Group' : 'Personal', // กำหนดประเภท
+            'type': widget.groupId != null ? 'Group' : 'Personal',
             'isGroupActivity': widget.groupId != null,
             'createdAt': FieldValue.serverTimestamp(),
           };
 
-          await FirebaseFirestore.instance
-              .collection('groups')
-              .doc(widget.groupId)
+          // สร้างกิจกรรมเพียงครั้งเดียวใน activities
+          final docRef = await FirebaseFirestore.instance
               .collection('activities')
               .add(activityData);
 
-          await FirebaseFirestore.instance
-              .collection('activities')
-              .add(activityData);
+          // เพิ่มกิจกรรมใน group activities หากมี groupId
+          if (widget.groupId != null) {
+            await FirebaseFirestore.instance
+                .collection('groups')
+                .doc(widget.groupId)
+                .collection('activities')
+                .doc(docRef.id)
+                .set(activityData);
+          }
         } else {
           // Create personal activity
           await FirebaseFirestore.instance
@@ -827,6 +871,12 @@ class _AddActivityScreenState extends State<AddActivityScreen>
     } catch (error) {
       print('Error saving activity: $error');
       _isSaving = false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save activity: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 

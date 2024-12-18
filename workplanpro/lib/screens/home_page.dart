@@ -234,7 +234,7 @@ class _HomePageState extends State<HomePage> {
       ),
     ),
   );
-
+  StreamSubscription<List<ActivityModel>>? _activitiesSubscription;
   String _sortBy = 'Nearest Date'; // ค่าเริ่มต้นในการเรียง
   bool _isAscending = true; // สำหรับการเรียงลำดับ
 
@@ -245,6 +245,42 @@ class _HomePageState extends State<HomePage> {
     _setupConnectivityListener();
     _loadCachedActivities();
     _fetchActivities();
+    _setupRealTimeActivitiesListener();
+  }
+
+  void _setupRealTimeActivitiesListener() {
+    _activitiesSubscription = _getActivitiesStream().listen(
+      (activities) {
+        if (mounted) {
+          setState(() {
+            _activities = activities;
+            _filteredActivities = _filterActivities();
+            _isLoading = false;
+          });
+        }
+      },
+      onError: (error) {
+        if (mounted) {
+          _handleError(error);
+        }
+      },
+    );
+  }
+
+  Stream<List<ActivityModel>> _getActivitiesStream() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return Stream.empty();
+    }
+
+    return FirebaseFirestore.instance
+        .collection('activities')
+        .where('userId', isEqualTo: user.uid)
+        .orderBy('date') // เรียงลำดับตามวันที่เริ่มต้น
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => ActivityModel.fromFirestore(doc))
+            .toList());
   }
 
   Future<void> _checkInitialConnectivity() async {
@@ -362,39 +398,9 @@ class _HomePageState extends State<HomePage> {
 
     try {
       setState(() => _isLoading = true);
-
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        throw Exception('User  not authenticated');
-      }
-
-      final QuerySnapshot querySnapshot = await FirebaseFirestore.instance
-          .collection('activities')
-          .where('userId', isEqualTo: user.uid)
-          .get()
-          .timeout(
-            Duration(seconds: 10),
-            onTimeout: () => throw TimeoutException('Connection timeout'),
-          );
-
-      List<ActivityModel> fetchedActivities = querySnapshot.docs
-          .map((doc) => ActivityModel.fromFirestore(doc))
-          .toList();
-
-      fetchedActivities.sort((a, b) => b.date.compareTo(a.date));
-
-      if (!_isDisposed) {
-        setState(() {
-          _activities = fetchedActivities;
-          _filteredActivities = _filterActivities();
-          _isLoading = false;
-        });
-
-        await _cacheActivities();
-      }
+      await _cacheActivities();
     } catch (e) {
       _handleError(e);
-      await _loadCachedActivities();
     }
   }
 
@@ -439,9 +445,9 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _activitiesSubscription?.cancel(); // ยกเลิกการสมัครสมาชิก
     _connectivitySubscription?.cancel();
     _searchController.dispose();
-    _isDisposed = true;
     super.dispose();
   }
 
@@ -663,44 +669,52 @@ class _HomePageState extends State<HomePage> {
   }
 
   List<ActivityModel> _applyAdvancedFilters(ActivityFilter filter) {
-    return _activities.where((activity) {
-      // Type Filter
+    List<ActivityModel> filteredList = _activities.where((activity) {
+      // กรองตามประเภท
       bool matchesType = filter.type == 'All' || activity.type == filter.type;
 
-      // Status Filter
-      bool matchesStatus =
-          filter.statusFilter == null || activity.status == filter.statusFilter;
+      // กรองตามสถานะ
+      bool matchesStatus = filter.statusFilter == null ||
+          filter.statusFilter == 'All' ||
+          activity.status == filter.statusFilter;
 
       return matchesType && matchesStatus;
-    }).toList()
-      ..sort((a, b) {
-        switch (filter.sortBy) {
-          case 'Nearest Date':
-            return filter.isAscending
-                ? a.date.compareTo(b.date)
-                : b.date.compareTo(a.date);
-          case 'Created At':
-            return filter.isAscending
-                ? a.id.compareTo(b.id)
-                : b.id.compareTo(a.id);
-          case 'Oldest':
-            return filter.isAscending
-                ? b.date.compareTo(a.date)
-                : a.date.compareTo(b.date);
-          default:
-            return 0;
-        }
-      });
+    }).toList();
+
+    // เรียงลำดับกิจกรรม
+    filteredList.sort((a, b) {
+      switch (filter.sortBy) {
+        case 'Nearest Date':
+          return filter.isAscending
+              ? a.date.compareTo(b.date)
+              : b.date.compareTo(a.date);
+
+        case 'Created At':
+          return filter.isAscending
+              ? a.id.compareTo(b.id)
+              : b.id.compareTo(a.id);
+
+        case 'Oldest':
+          return filter.isAscending
+              ? b.date.compareTo(a.date)
+              : a.date.compareTo(b.date);
+
+        default:
+          return 0;
+      }
+    });
+
+    return filteredList;
   }
 
   String _selectedStatus = 'All';
   List<ActivityModel> _filterActivities() {
-    return _activities.where((activity) {
-      bool matchesCategory = _selectedCategory == 'All' ||
-          activity.type == _selectedCategory ||
-          // เพิ่มเงื่อนไขสำหรับ Group
-          (_selectedCategory == 'Group' && activity.type == 'Group');
+    List<ActivityModel> filteredList = _activities.where((activity) {
+      // กรองตามประเภท
+      bool matchesCategory =
+          _selectedCategory == 'All' || activity.type == _selectedCategory;
 
+      // กรองตามการค้นหา
       bool matchesSearch = _searchQuery.isEmpty ||
           activity.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           activity.description
@@ -708,23 +722,30 @@ class _HomePageState extends State<HomePage> {
               .contains(_searchQuery.toLowerCase());
 
       return matchesCategory && matchesSearch;
-    }).toList()
-      ..sort((a, b) {
-        switch (_sortBy) {
-          case 'Nearest Date':
-            return _isAscending
-                ? a.date.compareTo(b.date)
-                : b.date.compareTo(a.date);
-          case 'Created At':
-            return _isAscending ? a.id.compareTo(b.id) : b.id.compareTo(a.id);
-          case 'Oldest':
-            return _isAscending
-                ? b.date.compareTo(a.date)
-                : a.date.compareTo(b.date);
-          default:
-            return 0;
-        }
-      });
+    }).toList();
+
+    // เรียงลำดับกิจกรรม
+    filteredList.sort((a, b) {
+      switch (_sortBy) {
+        case 'Nearest Date':
+          return _isAscending
+              ? a.date.compareTo(b.date)
+              : b.date.compareTo(a.date);
+
+        case 'Created At':
+          return _isAscending ? a.id.compareTo(b.id) : b.id.compareTo(a.id);
+
+        case 'Oldest':
+          return _isAscending
+              ? b.date.compareTo(a.date)
+              : a.date.compareTo(b.date);
+
+        default:
+          return 0;
+      }
+    });
+
+    return filteredList;
   }
 
   void _handleError(dynamic error) {

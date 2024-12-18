@@ -225,21 +225,27 @@ class ActivityService {
 
   Future<List<Activity>> fetchActivitiesWithFilters({
     String? userId,
+    String? groupId, // เพิ่ม parameter นี้
     DateTime? startDate,
     DateTime? endDate,
     String? status,
     String? type,
   }) async {
     try {
-      userId ??= _auth.currentUser?.uid;
+      Query query = _firestore.collection('activities');
 
-      if (userId == null) {
-        throw AuthenticationException('No user logged in');
+      // เพิ่มเงื่อนไขกรอง groupId
+      if (groupId != null) {
+        query = query.where('groupId', isEqualTo: groupId);
+      } else {
+        // ถ้าไม่มี groupId ให้ดึงเฉพาะกิจกรรมส่วนตัว
+        query = query.where('isGroupActivity', isEqualTo: false);
       }
 
-      Query query = _firestore
-          .collection('activities')
-          .where('userId', isEqualTo: userId);
+      // เงื่อนไขอื่นๆ คงเดิม
+      if (userId != null) {
+        query = query.where('userId', isEqualTo: userId);
+      }
 
       // Add optional filters
       if (startDate != null) {

@@ -32,8 +32,8 @@ class Activity {
     this.type = 'Personal',
     this.status = 'Pending',
     this.priority = 'Low',
-    this.groupId,
     this.groupName,
+    this.groupId,
     this.isGroupActivity = false,
     String? userId,
   }) : userId = userId ?? FirebaseAuth.instance.currentUser?.uid;

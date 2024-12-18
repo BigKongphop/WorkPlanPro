@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -34,6 +36,12 @@ class _AccountPageState extends State<AccountPage>
   List<Map<String, dynamic>> _userNotifications = [];
   List<Map<String, dynamic>> _userGroups = [];
   bool _isLoading = true;
+  int _totalActivitiesCount = 0;
+
+  bool _isTimeoutOccurred = false;
+  Timer? _loadingTimer;
+  static const int MINIMUM_LOADING_TIME = 2; // วินาที
+  static const int MAXIMUM_LOADING_TIME = 10; // วินาที
 
   final ThemeData appTheme = ThemeData(
     primarySwatch: Colors.green,
@@ -58,6 +66,13 @@ class _AccountPageState extends State<AccountPage>
   @override
   void initState() {
     super.initState();
+    _loadingTimer = Timer(Duration(seconds: MINIMUM_LOADING_TIME), () {
+      if (mounted && _isLoading) {
+        _loadAllUserData();
+      }
+    });
+
+    _loadAllUserData();
     _loadUserData();
     _fetchUserActivities();
     _fetchUserNotifications();
@@ -127,10 +142,241 @@ class _AccountPageState extends State<AccountPage>
     }
   }
 
+  Future<void> _loadAllUserData() async {
+    final startTime = DateTime.now();
+
+    setState(() {
+      _isLoading = true;
+      _userActivities = [];
+      _userGroups = [];
+      _userNotifications = [];
+      _totalActivitiesCount = 0;
+      _pendingInvitations = 0;
+    });
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        // สร้าง Map เพื่อเก็บข้อมูลทั้งหมด
+        Map<String, dynamic> allData = {
+          'userData': {},
+          'activities': [],
+          'totalActivitiesCount': 0,
+          'groups': [],
+          'notifications': [],
+          'pendingInvitations': 0
+        };
+
+        // เพิ่ม Future.wait เพื่อรอให้ทุก Future โหลดเสร็จ
+        await Future.wait([
+          // ดึงข้อมูลผู้ใช้
+          FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get()
+              .then((snapshot) {
+            allData['userData'] = snapshot.data() ?? {};
+          }).catchError((error) {
+            print('Error loading user data: $error');
+          }),
+
+          // ดึงกิจกรรม
+          FirebaseFirestore.instance
+              .collection('activities')
+              .where('userId', isEqualTo: user.uid)
+              .limit(5)
+              .get()
+              .then((snapshot) {
+            allData['activities'] = snapshot.docs
+                .map((doc) =>
+                    {...doc.data() as Map<String, dynamic>, 'id': doc.id})
+                .toList();
+          }).catchError((error) {
+            print('Error loading activities: $error');
+          }),
+
+          // นับจำนวนกิจกรรมทั้งหมด
+          FirebaseFirestore.instance
+              .collection('activities')
+              .where('userId', isEqualTo: user.uid)
+              .count()
+              .get()
+              .then((snapshot) {
+            allData['totalActivitiesCount'] = snapshot.count;
+          }).catchError((error) {
+            print('Error counting activities: $error');
+          }),
+
+          // ดึงกลุ่ม
+          FirebaseFirestore.instance
+              .collection('groups')
+              .where('memberEmails', arrayContains: widget.userEmail)
+              .limit(5)
+              .get()
+              .then((snapshot) {
+            allData['groups'] = snapshot.docs
+                .map((doc) => {
+                      'id': doc.id,
+                      'name': (doc.data() as Map<String, dynamic>)['name'] ??
+                          'Unnamed Group',
+                    })
+                .toList();
+          }).catchError((error) {
+            print('Error loading groups: $error');
+          }),
+
+          // ดึงการแจ้งเตือน
+          FirebaseFirestore.instance
+              .collection('notifications')
+              .where('userId', isEqualTo: user.uid)
+              .where('isRead', isEqualTo: false)
+              .limit(5)
+              .get()
+              .then((snapshot) {
+            allData['notifications'] = snapshot.docs
+                .map((doc) => {
+                      ...doc.data() as Map<String, dynamic>,
+                      'id': doc.id,
+                    })
+                .toList();
+          }).catchError((error) {
+            print('Error loading notifications: $error');
+          }),
+
+          // ดึงคำเชิญที่รอการตอบรับ
+          FirebaseFirestore.instance
+              .collectionGroup('members')
+              .where('email', isEqualTo: widget.userEmail)
+              .where('status', isEqualTo: 'pending')
+              .get()
+              .then((snapshot) {
+            allData['pendingInvitations'] = snapshot.docs.length;
+          }).catchError((error) {
+            print('Error loading pending invitations: $error');
+          }),
+        ]);
+
+        final loadDuration = DateTime.now().difference(startTime);
+        final minimumLoadTime = Duration(seconds: MINIMUM_LOADING_TIME);
+
+        // ถ้าโหลดเร็วกว่า 2 วินาที ให้รอจนครบ
+        if (loadDuration < minimumLoadTime) {
+          await Future.delayed(minimumLoadTime - loadDuration);
+        }
+
+        // ตรวจสอบว่า widget ยังคงอยู่และ mounted
+        if (mounted) {
+          setState(() {
+            // กำหนดค่าจากข้อมูลที่โหลด
+            _userData = allData['userData'] ?? {};
+            _userActivities = allData['activities'] ?? [];
+            _totalActivitiesCount = allData['totalActivitiesCount'] ?? 0;
+            _userGroups = allData['groups'] ?? [];
+            _userNotifications = allData['notifications'] ?? [];
+            _pendingInvitations = allData['pendingInvitations'] ?? 0;
+
+            // ปิด Loading State
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      // จัดการข้อผิดพลาด
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _showErrorDialog(e.toString());
+      }
+    }
+  }
+
+  void _showErrorDialog(String errorMessage) {
+    showDialog(
+      context: context,
+      builder: (context) => _buildErrorState(errorMessage),
+    );
+  }
+
+  Future<void> _fetchUserGroupsAsync() async {
+    try {
+      final groupsSnapshot = await FirebaseFirestore.instance
+          .collection('groups')
+          .where('memberEmails', arrayContains: widget.userEmail)
+          .limit(5)
+          .get();
+
+      if (mounted) {
+        setState(() {
+          _userGroups = groupsSnapshot.docs
+              .map((doc) => {
+                    'id': doc.id,
+                    'name': doc.data()['name'] ?? 'Unnamed Group',
+                  })
+              .toList();
+        });
+      }
+    } catch (e) {
+      print('Error fetching groups: $e');
+    }
+  }
+
+  Future<void> _fetchUserNotificationsAsync() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final notificationsSnapshot = await FirebaseFirestore.instance
+            .collection('notifications')
+            .where('userId', isEqualTo: user.uid)
+            .where('isRead', isEqualTo: false)
+            .limit(5)
+            .get();
+
+        if (mounted) {
+          setState(() {
+            _userNotifications = notificationsSnapshot.docs
+                .map((doc) => {
+                      ...doc.data(),
+                      'id': doc.id,
+                    })
+                .toList();
+          });
+        }
+      }
+    } catch (e) {
+      print('Error fetching notifications: $e');
+    }
+  }
+
+  Future<void> _fetchPendingInvitationsAsync() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collectionGroup('members')
+          .where('email', isEqualTo: widget.userEmail)
+          .where('status', isEqualTo: 'pending')
+          .get();
+
+      if (mounted) {
+        setState(() {
+          _pendingInvitations = snapshot.docs.length;
+        });
+      }
+    } catch (e) {
+      print('Error fetching pending invitations: $e');
+    }
+  }
+
   Future<void> _fetchUserActivities() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
+        // First, get the total count of activities
+        final totalCountQuery = await FirebaseFirestore.instance
+            .collection('activities')
+            .where('userId', isEqualTo: user.uid)
+            .count()
+            .get();
+
         final activitiesSnapshot = await FirebaseFirestore.instance
             .collection('activities')
             .where('userId', isEqualTo: user.uid)
@@ -144,6 +390,7 @@ class _AccountPageState extends State<AccountPage>
                     'id': doc.id,
                   })
               .toList();
+          _totalActivitiesCount = totalCountQuery.count!;
         });
       }
     } catch (e) {
@@ -186,12 +433,22 @@ class _AccountPageState extends State<AccountPage>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildStatItem('Activities', _userActivities.length.toString(),
+          _buildStatItem(
+              'Activities',
+              _userActivities.length == 5 && _totalActivitiesCount > 5
+                  ? '5+'
+                  : _userActivities.length.toString(),
               FontAwesomeIcons.chartLine),
-          _buildStatItem('Notifications', _pendingInvitations.toString(),
+          _buildStatItem(
+              'Notifications',
+              _pendingInvitations > 5 ? '5+' : _pendingInvitations.toString(),
               FontAwesomeIcons.bell),
           _buildStatItem(
-              'Groups', _userGroups.length.toString(), FontAwesomeIcons.users),
+              'Groups',
+              _userGroups.length == 5 && _userGroups.length > 5
+                  ? '5+'
+                  : _userGroups.length.toString(),
+              FontAwesomeIcons.users),
         ],
       ),
     );
@@ -240,6 +497,8 @@ class _AccountPageState extends State<AccountPage>
   }
 
   Widget _buildRecentActivitiesSection() {
+    print(
+        'Building Recent Activities: ${_userActivities.length} activities'); // Debug print
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -276,18 +535,20 @@ class _AccountPageState extends State<AccountPage>
                           ),
                         ),
                         title: Text(
-                          activity['description'] ?? 'Activity',
+                          activity['title'] ?? 'Activity',
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
                             color: Colors.green.shade800,
                           ),
                         ),
                         subtitle: Text(
-                          _formatTimestamp(activity['timestamp']),
+                          activity['description'] ?? '',
                           style: TextStyle(
                             color: Colors.grey.shade600,
                             fontSize: 12,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     );
@@ -375,7 +636,6 @@ class _AccountPageState extends State<AccountPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       body: _isLoading
           ? _buildLoadingState()
           : NestedScrollView(
@@ -421,8 +681,6 @@ class _AccountPageState extends State<AccountPage>
                   _buildAccountStatistics(),
                   SizedBox(height: 16),
                   _buildRecentActivitiesSection(),
-                  SizedBox(height: 16),
-                  _buildRecentNotificationsSection(),
                   SizedBox(height: 16),
                   _buildContactInformationSection(),
                   SizedBox(height: 16),
@@ -490,30 +748,400 @@ class _AccountPageState extends State<AccountPage>
   }
 
   Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Shimmer.fromColors(
-            baseColor: Colors.green.shade200,
-            highlightColor: Colors.green.shade50,
-            child: CircleAvatar(
-              radius: 60,
-              backgroundColor: Colors.green.shade100,
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Animated Logo with Pulse Effect
+              _buildAnimatedLogo(),
+
+              SizedBox(height: 40),
+
+              // Sleek Loading Progress Indicator
+              _buildSleekProgressIndicator(),
+
+              SizedBox(height: 30),
+
+              // Professional Loading Text
+              _buildProfessionalLoadingText(),
+
+              SizedBox(height: 20),
+
+              // Descriptive Subtext
+              _buildLoadingSubtext(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnimatedLogo() {
+    return TweenAnimationBuilder<double>(
+      duration: Duration(seconds: 1),
+      tween: Tween(begin: 0.8, end: 1.0),
+      curve: Curves.elasticOut,
+      builder: (context, scale, child) {
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            width: 180,
+            height: 180,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [
+                  Colors.green.shade500,
+                  Colors.green.shade800,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.green.shade200,
+                  blurRadius: 25,
+                  offset: Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Icon(
+                Icons.cloud_download, // More professional download icon
+                color: Colors.white,
+                size: 100,
+              ),
             ),
           ),
-          SizedBox(height: 16),
-          Shimmer.fromColors(
-            baseColor: Colors.grey.shade300,
-            highlightColor: Colors.grey.shade100,
+        );
+      },
+    );
+  }
+
+  Widget _buildSleekProgressIndicator() {
+    return Container(
+      width: 300,
+      height: 12,
+      decoration: BoxDecoration(
+        color: Colors.green.shade100,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: TweenAnimationBuilder<double>(
+        duration: Duration(seconds: 2),
+        tween: Tween(begin: 0.0, end: 1.0),
+        builder: (context, progress, child) {
+          return FractionallySizedBox(
+            widthFactor: progress,
+            alignment: Alignment.centerLeft,
             child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.green.shade400,
+                    Colors.green.shade700,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildProfessionalLoadingText() {
+    return Text(
+      'Preparing Your Download',
+      style: TextStyle(
+        fontSize: 24,
+        fontWeight: FontWeight.w600,
+        color: Colors.green.shade800,
+        letterSpacing: 1.1,
+      ),
+    );
+  }
+
+  Widget _buildLoadingSubtext() {
+    return Text(
+      'Optimizing resources for a smooth experience...',
+      style: TextStyle(
+        color: Colors.grey.shade600,
+        fontSize: 16,
+        fontStyle: FontStyle.italic,
+      ),
+      textAlign: TextAlign.center,
+    );
+  }
+
+  Widget _buildLoadingText() {
+    return TweenAnimationBuilder<double>(
+      duration: Duration(seconds: 1),
+      tween: Tween(begin: 0.0, end: 1.0),
+      builder: (context, opacity, child) {
+        return Opacity(
+          opacity: opacity,
+          child: Text(
+            'Loading Your Profile',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.green.shade700,
+              letterSpacing: 1.2,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCustomProgressIndicator() {
+    return Container(
+      width: 250,
+      height: 10,
+      decoration: BoxDecoration(
+        color: Colors.green.shade100,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: TweenAnimationBuilder<double>(
+        duration: Duration(seconds: 2),
+        tween: Tween(begin: 0.0, end: 1.0),
+        builder: (context, progress, child) {
+          return FractionallySizedBox(
+            widthFactor: progress,
+            alignment: Alignment.centerLeft,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.green.shade400,
+                    Colors.green.shade700,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDescriptiveText() {
+    return TweenAnimationBuilder<double>(
+      duration: Duration(seconds: 1),
+      tween: Tween(begin: 0.0, end: 1.0),
+      builder: (context, opacity, child) {
+        return Opacity(
+          opacity: opacity,
+          child: Text(
+            'Preparing your personalized experience...',
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 16,
+              fontStyle: FontStyle.italic,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        );
+      },
+    );
+  }
+
+// Bonus: Animated Error State
+  Widget _buildErrorState(String errorMessage) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Error Icon with Animation
+            TweenAnimationBuilder<double>(
+              duration: Duration(milliseconds: 500),
+              tween: Tween(begin: 0.5, end: 1.0),
+              builder: (context, scale, child) {
+                return Transform.scale(
+                  scale: scale,
+                  child: Icon(
+                    Icons.error_outline,
+                    color: Colors.red.shade400,
+                    size: 100,
+                  ),
+                );
+              },
+            ),
+
+            SizedBox(height: 20),
+
+            // Error Title
+            Text(
+              'Oops! Something went wrong',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.red.shade700,
+              ),
+            ),
+
+            SizedBox(height: 10),
+
+            // Error Message
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 30),
+              child: Text(
+                errorMessage,
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 16,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+
+            SizedBox(height: 30),
+
+            // Retry Button
+            ElevatedButton(
+              onPressed: () {
+                // Implement retry logic
+                _loadAllUserData();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green.shade600,
+                padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+              child: Text(
+                'Try Again',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShimmerHeader() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Container(
+        height: 350,
+        color: Colors.white,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Shimmer Profile Image
+            Container(
+              width: 160,
+              height: 160,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(height: 15),
+
+            // Shimmer Username
+            Container(
               width: 200,
-              height: 20,
+              height: 24,
               color: Colors.white,
             ),
-          ),
-        ],
+            SizedBox(height: 8),
+
+            // Shimmer Email
+            Container(
+              width: 150,
+              height: 16,
+              color: Colors.white,
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildShimmerStatistics() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: List.generate(3, (index) {
+          return Column(
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                ),
+              ),
+              SizedBox(height: 8),
+              Container(
+                width: 50,
+                height: 16,
+                color: Colors.white,
+              ),
+              SizedBox(height: 4),
+              Container(
+                width: 40,
+                height: 12,
+                color: Colors.white,
+              ),
+            ],
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildShimmerSection(String title) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Shimmer Section Title
+        Shimmer.fromColors(
+          baseColor: Colors.grey[300]!,
+          highlightColor: Colors.grey[100]!,
+          child: Container(
+            width: 150,
+            height: 24,
+            color: Colors.white,
+          ),
+        ),
+        SizedBox(height: 8),
+
+        // Shimmer List Items
+        Shimmer.fromColors(
+          baseColor: Colors.grey[300]!,
+          highlightColor: Colors.grey[100]!,
+          child: Column(
+            children: List.generate(3, (index) {
+              return Container(
+                margin: EdgeInsets.symmetric(vertical: 8),
+                height: 70,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              );
+            }),
+          ),
+        ),
+      ],
     );
   }
 
@@ -740,6 +1368,12 @@ class _AccountPageState extends State<AccountPage>
         SnackBar(content: Text('Error logging out: $e')),
       );
     }
+  }
+
+  @override
+  void dispose() {
+    _loadingTimer?.cancel();
+    super.dispose();
   }
 }
 
