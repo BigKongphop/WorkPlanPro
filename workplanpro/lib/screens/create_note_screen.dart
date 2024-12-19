@@ -80,7 +80,7 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Color(0xFF0C5217),
+        backgroundColor: const Color(0xFF2C8C4B),
         title: Text(
           widget.note != null ? 'Edit Note' : 'New Note',
           style: TextStyle(color: Colors.white),
@@ -101,7 +101,7 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
                 style: TextStyle(
                   fontSize: 24.0,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF0C5217),
+                  color: Color(0xFF2C8C4B),
                 ),
               ),
               SizedBox(height: 16.0),
@@ -109,15 +109,15 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
                 controller: titleController,
                 decoration: InputDecoration(
                   labelText: 'Title',
-                  labelStyle: TextStyle(color: Color(0xFF0C5217)),
+                  labelStyle: TextStyle(color: Color(0xFF2C8C4B)),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10.0),
-                    borderSide: BorderSide(color: Color(0xFF0C5217)),
+                    borderSide: BorderSide(color: Color(0xFF2C8C4B)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10.0),
                     borderSide: BorderSide(
-                      color: Color(0xFF0C5217),
+                      color: Color(0xFF2C8C4B),
                       width: 2.0,
                     ),
                   ),
@@ -128,15 +128,15 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
                 controller: contentController,
                 decoration: InputDecoration(
                   labelText: 'Content',
-                  labelStyle: TextStyle(color: Color(0xFF0C5217)),
+                  labelStyle: TextStyle(color: Color(0xFF2C8C4B)),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10.0),
-                    borderSide: BorderSide(color: Color(0xFF0C5217)),
+                    borderSide: BorderSide(color: Color(0xFF2C8C4B)),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10.0),
                     borderSide: BorderSide(
-                      color: Color(0xFF0C5217),
+                      color: Color(0xFF2C8C4B),
                       width: 2.0,
                     ),
                   ),
@@ -144,7 +144,52 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
                 maxLines: 8,
               ),
               SizedBox(height: 24.0),
-              _buildRatingStars(),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Importance:',
+                    style: TextStyle(
+                      fontSize: 18.0,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2C8C4B),
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: List.generate(3, (index) {
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _rating = index + 1;
+                          });
+                        },
+                        child: Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: Column(
+                            children: [
+                              Icon(
+                                index < _rating
+                                    ? Icons.star
+                                    : Icons.star_border,
+                                color: Color(0xFF2C8C4B),
+                                size: 40,
+                              ),
+                              Text(
+                                ratingDescriptions[index + 1] ?? '',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+              ),
               SizedBox(height: 24.0),
               Center(
                 child: ElevatedButton(
@@ -178,14 +223,17 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
                                 Navigator.of(context).pop(newNote);
                               }
                             },
-                            child: Text('Save'),
+                            child: Text(
+                              'Save',
+                              style: TextStyle(color: Color(0xFF2C8C4B)),
+                            ),
                           ),
                         ],
                       ),
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF0C5217),
+                    backgroundColor: Color(0xFF2C8C4B),
                     padding:
                         EdgeInsets.symmetric(horizontal: 48.0, vertical: 16.0),
                     shape: RoundedRectangleBorder(

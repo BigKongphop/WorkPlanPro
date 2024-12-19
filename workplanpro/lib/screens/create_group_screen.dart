@@ -112,9 +112,11 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0C5217),
-        title: const Text('Create New Group',
-            style: TextStyle(color: Colors.white)),
+        backgroundColor: const Color(0xFF2C8C4B),
+        title: const Text(
+          'Create New Group',
+          style: TextStyle(color: Colors.white),
+        ),
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -154,7 +156,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                           right: 16,
                           child: Container(
                             decoration: BoxDecoration(
-                              color: Color(0xFF0C5217),
+                              color: Color(0xFF2C8C4B),
                               shape: BoxShape.circle,
                             ),
                             child: IconButton(
@@ -177,7 +179,13 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    prefixIcon: Icon(Icons.group),
+                    prefixIcon: Icon(Icons.group, color: Color(0xFF2C8C4B)),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide:
+                          BorderSide(color: Color(0xFF2C8C4B), width: 2),
+                    ),
+                    labelStyle: TextStyle(color: Color(0xFF2C8C4B)),
                   ),
                   validator: (value) {
                     if (value?.trim().isEmpty ?? true) {
@@ -198,7 +206,14 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    prefixIcon: Icon(Icons.description),
+                    prefixIcon:
+                        Icon(Icons.description, color: Color(0xFF2C8C4B)),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide:
+                          BorderSide(color: Color(0xFF2C8C4B), width: 2),
+                    ),
+                    labelStyle: TextStyle(color: Color(0xFF2C8C4B)),
                   ),
                 ),
                 SizedBox(height: 24),
@@ -207,7 +222,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _createGroup,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0C5217),
+                      backgroundColor: const Color(0xFF2C8C4B),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
