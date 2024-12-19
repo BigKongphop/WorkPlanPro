@@ -1,4 +1,3 @@
-//group
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:motion_tab_bar_v2/motion-tab-bar.dart';
@@ -282,486 +281,284 @@ class _GroupPageState extends State<GroupPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, // เปลี่ยนพื้นหลังเป็นขาว
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          SliverAppBar(
-            expandedHeight: 250.0,
-            floating: false,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              centerTitle: true,
-              title: Text(
-                'My Groups',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+      backgroundColor: Colors.white, // Changed from Color(0xFF0C5217)
+      appBar: AppBar(
+        backgroundColor: Color(0xFF2C8C4B), // Changed
+        title: const Text('Group List', style: TextStyle(color: Colors.white)),
+        elevation: 0,
+        actions: [
+          NotificationWidget(userEmail: widget.userEmail),
+        ],
+      ),
+      body: Column(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF2C8C4B), Color(0xFF4CAF50)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value.trim();
+                  });
+                },
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.white24,
+                  hintText: 'Search groups...',
+                  hintStyle: TextStyle(color: Colors.white70),
+                  prefixIcon: const Icon(Icons.search, color: Colors.white),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
-              background: _buildGroupPageHeader(),
             ),
-            actions: [
-              NotificationWidget(userEmail: widget.userEmail),
-            ],
+          ),
+          Expanded(
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(30),
+                  topRight: Radius.circular(30),
+                ),
+              ),
+              child: StreamBuilder<QuerySnapshot>(
+                stream: _groupsStream,
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    print('Error loading groups: ${snapshot.error}');
+                    return Center(child: Text('Error loading groups'));
+                  }
+
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Center(child: CircularProgressIndicator());
+                  }
+
+                  var groups = snapshot.data?.docs ?? [];
+
+                  // Filter groups based on search query
+                  if (_searchQuery.isNotEmpty) {
+                    groups = groups.where((group) {
+                      final data = group.data() as Map<String, dynamic>;
+                      final name =
+                          (data['name'] ?? '').toString().toLowerCase();
+                      final description =
+                          (data['description'] ?? '').toString().toLowerCase();
+                      final searchLower = _searchQuery.toLowerCase();
+
+                      return name.contains(searchLower) ||
+                          description.contains(searchLower);
+                    }).toList();
+                  }
+
+                  if (groups.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.group_outlined,
+                              size: 64, color: Colors.grey[400]),
+                          const SizedBox(height: 16),
+                          Text(
+                            _searchQuery.isEmpty
+                                ? 'No groups found\nTap + to create a new group'
+                                : 'No groups match your search',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                color: Colors.grey[600], fontSize: 16),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ReorderableListView.builder(
+                    itemCount: groups.length,
+                    onReorder: (oldIndex, newIndex) async {
+                      if (oldIndex < newIndex) {
+                        newIndex -= 1;
+                      }
+
+                      try {
+                        final batch = FirebaseFirestore.instance.batch();
+                        final items = List<QueryDocumentSnapshot>.from(groups);
+                        final item = items.removeAt(oldIndex);
+                        items.insert(newIndex, item);
+
+                        for (var i = 0; i < items.length; i++) {
+                          batch.update(items[i].reference, {'order': i});
+                        }
+
+                        await batch.commit();
+                      } catch (e) {
+                        print('Error reordering: $e');
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text('Error updating group order')));
+                      }
+                    },
+                    itemBuilder: (context, index) {
+                      return Dismissible(
+                        key: Key(groups[index].id),
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          height: 85,
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 16),
+                          child: const Icon(Icons.delete,
+                              color: Colors.white, size: 20),
+                        ),
+                        confirmDismiss: (direction) =>
+                            _showDeleteConfirmDialog(),
+                        onDismissed: (direction) async {
+                          try {
+                            final data =
+                                groups[index].data() as Map<String, dynamic>;
+                            if (data['creatorEmail'] == widget.userEmail) {
+                              await FirebaseFirestore.instance
+                                  .collection('groups')
+                                  .doc(groups[index].id)
+                                  .delete();
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content:
+                                        Text('Group successfully deleted')),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text(
+                                        'You do not have permission to delete this group.')),
+                              );
+                            }
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text(
+                                      'An error occurred deleting the group.')),
+                            );
+                          }
+                        },
+                        child: _buildGroupCard(groups[index]),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
           ),
         ],
-        body: Column(
-          children: [
-            _buildSearchBar(),
-            Expanded(
-              child: _buildGroupList(),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => CreateGroupScreen(
+                currentUsername: widget.username,
+                currentEmail: widget.userEmail,
+              ),
             ),
-          ],
+          );
+
+          if (result == true) {
+            setState(() {});
+          }
+        },
+        backgroundColor: Color(0xFF2C8C4B), // Changed
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text(
+          "New Group",
+          style: TextStyle(color: Colors.white),
         ),
       ),
-      floatingActionButton: _buildCreateGroupButton(),
       bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }
 
-  Widget NotificationWidget({required String userEmail}) {
-    return FutureBuilder<int>(
-      future: _fetchPendingInvitations(userEmail),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return IconButton(
-            icon: Icon(Icons.notifications_none, color: Colors.white),
-            onPressed: null,
-          );
-        }
-
-        int pendingInvitations = snapshot.data ?? 0;
-        return Stack(
-          children: [
-            IconButton(
-              icon: Icon(Icons.notifications_none, color: Colors.white),
-              onPressed: () {
-                // Navigation logic for notifications
-              },
-            ),
-            if (pendingInvitations > 0)
-              Positioned(
-                right: 0,
-                top: 0,
-                child: Container(
-                  padding: EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    '$pendingInvitations',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<int> _fetchPendingInvitations(String userEmail) async {
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collectionGroup('members')
-          .where('email', isEqualTo: userEmail)
-          .where('status', isEqualTo: 'pending')
-          .get();
-
-      return snapshot.docs.length;
-    } catch (e) {
-      print('Error fetching pending invitations: $e');
-      return 0;
-    }
-  }
-
-  Widget _buildGroupPageHeader() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF2C8C4B), Color(0xFF4CAF50)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.group_outlined,
-            size: 80,
-            color: Colors.white,
-          ),
-          SizedBox(height: 15),
-          Text(
-            'Collaborate & Connect',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 16,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: Colors.green.shade100,
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
-        ),
-        child: TextField(
-          controller: _searchController,
-          onChanged: (value) {
-            setState(() => _searchQuery = value);
-          },
-          style: const TextStyle(color: Colors.black87),
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.white,
-            hintText: 'Search groups...',
-            prefixIcon: Icon(Icons.search, color: Color(0xFF0C5217)),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: BorderSide(color: Colors.green.shade100),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGroupList() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: _groupsStream,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return _buildErrorState();
-        }
-
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingState();
-        }
-
-        final groups = snapshot.data?.docs ?? [];
-
-        if (groups.isEmpty) {
-          return _buildEmptyState();
-        }
-
-        return ReorderableListView.builder(
-          itemCount: groups.length,
-          onReorder: _reorderGroups,
-          itemBuilder: (context, index) {
-            return _buildGroupCard(groups[index]);
-          },
-        );
-      },
-    );
-  }
-// Add these methods to the _GroupPageState class
-
-// Create Group Button
-  Widget _buildCreateGroupButton() {
-    return FloatingActionButton.extended(
-      onPressed: () async {
-        final result = await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => CreateGroupScreen(
-              currentUsername: widget.username,
-              currentEmail: widget.userEmail,
-            ),
-          ),
-        );
-
-        if (result == true) {
-          setState(() {});
-        }
-      },
-      backgroundColor: Color(0xFF0C5217),
-      icon: Icon(Icons.add, color: Colors.white),
-      label: Text(
-        "Create Group",
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-
-// Error State
-  Widget _buildErrorState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.error_outline,
-            size: 80,
-            color: Colors.red.shade300,
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Failed to load groups',
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 16,
-            ),
-          ),
-          Text(
-            'Please check your connection',
-            style: TextStyle(
-              color: Colors.grey.shade500,
-              fontSize: 14,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-// Loading State
-  Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0C5217)),
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Loading Groups...',
-            style: TextStyle(
-              color: Colors.grey.shade600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-// Empty State
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.group_off_outlined,
-            size: 80,
-            color: Colors.green.shade200,
-          ),
-          SizedBox(height: 16),
-          Text(
-            'No Groups Yet',
-            style: TextStyle(
-              color: Color(0xFF0C5217),
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Create your first group and start collaborating!',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.grey.shade600,
-            ),
-          ),
-          SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CreateGroupScreen(
-                    currentUsername: widget.username,
-                    currentEmail: widget.userEmail,
-                  ),
-                ),
-              );
-
-              if (result == true) {
-                setState(() {});
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF0C5217),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(
-              'Create First Group',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-// Reorder Groups Method
-  void _reorderGroups(int oldIndex, int newIndex) async {
-    if (oldIndex < newIndex) {
-      newIndex -= 1;
-    }
-
-    try {
-      final QuerySnapshot? querySnapshot = await _groupsStream.first;
-      final groups = querySnapshot?.docs ?? [];
-
-      final batch = FirebaseFirestore.instance.batch();
-      final item = groups.removeAt(oldIndex);
-      groups.insert(newIndex, item);
-
-      for (var i = 0; i < groups.length; i++) {
-        batch.update(groups[i].reference, {'order': i});
-      }
-
-      await batch.commit();
-    } catch (e) {
-      print('Error reordering groups: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating group order')),
-      );
-    }
-  }
-
-// Group Avatar Builder
-  Widget _buildGroupAvatar(Map<String, dynamic> data) {
-    return Container(
-      width: 50,
-      height: 50,
-      decoration: BoxDecoration(
-        color: Colors.green.shade100,
-        borderRadius: BorderRadius.circular(25),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(25),
-        child:
-            data['imageUrl'] != null && data['imageUrl'].toString().isNotEmpty
-                ? Image.network(
-                    data['imageUrl'],
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Icon(
-                        Icons.group,
-                        color: Colors.green.shade700,
-                      );
-                    },
-                  )
-                : Icon(
-                    Icons.group,
-                    color: Colors.green.shade700,
-                  ),
-      ),
-    );
-  }
-
-// Navigation to Group Detail
-  void _navigateToGroupDetail(QueryDocumentSnapshot group) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => GroupDetailScreen(
-          groupId: group.id,
-          username: widget.username,
-          userEmail: widget.userEmail,
-        ),
-      ),
-    );
-  }
-
   Widget _buildBottomNavigationBar() {
-    return SafeArea(
-      // เพิ่ม SafeArea เพื่อป้องกัน overflow
-      child: MotionTabBar(
-        labels: const ["Home", "Account", "Notes", "Calendar", "Groups"],
-        icons: const [
-          Icons.home,
-          Icons.person,
-          Icons.book,
-          Icons.calendar_today,
-          Icons.group
-        ],
-        initialSelectedTab: "Groups",
-        tabIconColor: const Color(0xFF0C5217),
-        tabSelectedColor: Colors.green,
-        onTabItemSelected: (int index) {
-          setState(() {
-            _currentIndex = index;
-          });
-          switch (index) {
-            case 0:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => HomePage(
-                    username: widget.username,
-                    userEmail: widget.userEmail,
-                  ),
+    return MotionTabBar(
+      labels: const ["Home", "Account", "Notes", "Calendar", "Groups"],
+      icons: const [
+        Icons.home,
+        Icons.person,
+        Icons.book,
+        Icons.calendar_today,
+        Icons.group
+      ],
+      initialSelectedTab: "Groups",
+      tabIconColor: const Color(0xFF0C5217),
+      tabSelectedColor: Colors.green,
+      onTabItemSelected: (int index) {
+        setState(() {
+          _currentIndex = index;
+        });
+        switch (index) {
+          case 0:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HomePage(
+                  username: widget.username,
+                  userEmail: widget.userEmail,
                 ),
-              );
-              break;
-            case 1:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AccountPage(
-                    initialUsername: widget.username,
-                    userEmail: widget.userEmail,
-                  ),
+              ),
+            );
+            break;
+          case 1:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AccountPage(
+                  initialUsername: widget.username,
+                  userEmail: widget.userEmail,
                 ),
-              );
-              break;
-            case 2:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => NotePage(
-                    username: widget.username,
-                    userEmail: widget.userEmail,
-                  ),
+              ),
+            );
+            break;
+          case 2:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => NotePage(
+                  username: widget.username,
+                  userEmail: widget.userEmail,
                 ),
-              );
-              break;
-            case 3:
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => CalendarPage(
-                    username: widget.username,
-                    userEmail: widget.userEmail,
-                  ),
+              ),
+            );
+            break;
+          case 3:
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CalendarPage(
+                  username: widget.username,
+                  userEmail: widget.userEmail,
                 ),
-              );
-              break;
-            case 4:
-              break;
-          }
-        },
-      ),
+              ),
+            );
+            break;
+          case 4:
+            break;
+        }
+      },
     );
   }
 

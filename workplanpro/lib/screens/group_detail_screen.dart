@@ -343,7 +343,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0C5217),
+        backgroundColor: const Color(0xFF2C8C4B), // Changed
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
@@ -405,7 +405,13 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
       body: Column(
         children: [
           Container(
-            color: const Color(0xFF0C5217),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF2C8C4B), Color(0xFF4CAF50)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -535,7 +541,6 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     );
   }
 
-
   Widget _buildMessageInput() {
     return Padding(
       padding: const EdgeInsets.all(8.0),
@@ -587,7 +592,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
               _isUploading
                   ? CircularProgressIndicator()
                   : CircleAvatar(
-                      backgroundColor: Color(0xFF0C5217),
+                      backgroundColor: Color(0xFF2C8C4B),
                       child: IconButton(
                         icon: Icon(
                           _editingMessageId != null ? Icons.check : Icons.send,
@@ -663,7 +668,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           ),
           padding: EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: isMyMessage ? Color(0xFF0C5217) : Colors.grey[200],
+            color: isMyMessage ? Color(0xFF2C8C4B) : Colors.grey[200],
             borderRadius: BorderRadius.circular(20),
           ),
           child: Column(
