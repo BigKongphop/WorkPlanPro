@@ -167,6 +167,8 @@ class ActivityModel {
   final DateTime date;
   final String type;
   final String status;
+  final TimeOfDay startTime;
+  final TimeOfDay endTime;
 
   ActivityModel({
     required this.id,
@@ -174,19 +176,56 @@ class ActivityModel {
     required this.description,
     required this.date,
     required this.type,
-    this.status = 'Pending', // Nilai default
-  });
+    this.status = 'Pending',
+    TimeOfDay? startTime,
+    TimeOfDay? endTime,
+  })  : startTime = startTime ?? TimeOfDay.now(),
+        endTime = endTime ??
+            TimeOfDay(
+                hour: TimeOfDay.now().hour + 1, minute: TimeOfDay.now().minute);
 
+  // ฟังก์ชันสำหรับแสดงเวลา
+  String formatTime(TimeOfDay time) {
+    final now = DateTime.now();
+    final dt = DateTime(now.year, now.month, now.day, time.hour, time.minute);
+    return DateFormat('HH:mm').format(dt);
+  }
+
+  // Factory method สำหรับสร้าง ActivityModel จาก Firestore
   factory ActivityModel.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+
     return ActivityModel(
       id: doc.id,
       title: data['title'] ?? '',
       description: data['description'] ?? '',
       date: (data['date'] as Timestamp).toDate(),
       type: data['type'] ?? 'Personal',
-      status: data['status'] ?? 'Pending', // Tambahkan ini
+      status: data['status'] ?? 'Pending',
+      startTime: _parseTimeOfDay(data['startTime']),
+      endTime: _parseTimeOfDay(data['endTime']),
     );
+  }
+
+  // เมธอดช่วยแปลง Timestamp เป็น TimeOfDay
+  static TimeOfDay _parseTimeOfDay(dynamic timeData) {
+    if (timeData == null) {
+      return TimeOfDay.now(); // ค่าเริ่มต้นหากไม่มีข้อมูล
+    }
+
+    if (timeData is Timestamp) {
+      DateTime dateTime = timeData.toDate();
+      return TimeOfDay.fromDateTime(dateTime);
+    }
+
+    if (timeData is Map<String, dynamic>) {
+      return TimeOfDay(
+        hour: timeData['hour'] ?? DateTime.now().hour,
+        minute: timeData['minute'] ?? DateTime.now().minute,
+      );
+    }
+
+    return TimeOfDay.now(); // ค่าเริ่มต้นหากรูปแบบไม่ถูกต้อง
   }
 }
 
@@ -249,22 +288,23 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _setupRealTimeActivitiesListener() {
-    _activitiesSubscription = _getActivitiesStream().listen(
-      (activities) {
-        if (mounted) {
-          setState(() {
-            _activities = activities;
-            _filteredActivities = _filterActivities();
-            _isLoading = false;
-          });
-        }
-      },
-      onError: (error) {
-        if (mounted) {
-          _handleError(error);
-        }
-      },
-    );
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    FirebaseFirestore.instance
+        .collection('activities')
+        .where('userId', isEqualTo: user.uid)
+        .snapshots()
+        .listen((snapshot) {
+      setState(() {
+        _activities = snapshot.docs.map((doc) {
+          return ActivityModel.fromFirestore(doc);
+        }).toList();
+        _filteredActivities = _filterActivities(); // อัปเดต filtered activities
+      });
+    }, onError: (error) {
+      print('Error listening to activities: $error');
+    });
   }
 
   Stream<List<ActivityModel>> _getActivitiesStream() {
@@ -806,47 +846,58 @@ class _HomePageState extends State<HomePage> {
   // Widget untuk Menampilkan Aktivitas
   Widget _buildActivityCard(ActivityModel activity) {
     return Card(
-      elevation: 4,
-      margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      child: ExpansionTile(
+      margin: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+      child: ListTile(
         title: Text(
           activity.title,
-          style: TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0C5217),
+          ),
         ),
-        subtitle: Text(
-          DateFormat('dd MMM yyyy').format(activity.date),
-          style: TextStyle(color: Colors.grey),
-        ),
-        children: [
-          Padding(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  activity.description,
-                  style: TextStyle(color: Colors.black87),
-                ),
-                SizedBox(height: 8),
-                /*Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Chip(
-                      label: Text(activity.type),
-                      backgroundColor: _getPriorityColor(activity.priority),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.more_vert),
-                      onPressed: () => _showActivityOptions(activity),
-                    )
-                  ],
-                )*/
-              ],
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              DateFormat('dd MMM yyyy').format(activity.date),
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 12,
+              ),
             ),
-          )
-        ],
+            Text(
+              'Time: ${activity.formatTime(activity.startTime)} - ${activity.formatTime(activity.endTime)}',
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+        trailing: Container(
+          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: _getStatusColor(activity.status).withOpacity(0.2),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            activity.status,
+            style: TextStyle(
+              color: _getStatusColor(activity.status),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        onTap: () => _showActivityDetails(activity),
       ),
     );
+  }
+
+  String _formatTime(TimeOfDay time) {
+    final hours = time.hour.toString().padLeft(2, '0');
+    final minutes = time.minute.toString().padLeft(2, '0');
+    return '$hours:$minutes';
   }
 
   // Warna Prioritas
@@ -1236,26 +1287,48 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _createActivity(
-      String title, String description, String type, String priority) async {
+  Future<void> _createActivity() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
+      // Use the existing AddActivityScreen to create a new activity
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AddActivityScreen(
+            // You can pass initial values if needed
+            initialType: ActivityType.Personal,
+            initialDate: DateTime.now(),
+          ),
+        ),
+      );
 
-      await FirebaseFirestore.instance.collection('activities').add({
-        'userId': user.uid,
-        'title': title,
-        'description': description,
-        'date': Timestamp.now(),
-        'type': type,
-        'priority': priority,
-        'status': 'Pending',
-      });
+      // Handle the result if an activity was created
+      if (result != null && result is Map) {
+        // Check if an activity was added
+        if (result['action'] == 'create' && result['activity'] != null) {
+          Activity newActivity = result['activity'];
 
-      await _fetchActivities();
+          // Optional: Refresh the activity list or perform any additional actions
+          // For example:
+          // _loadActivities();
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Activity created successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
     } catch (e) {
-      print('Error creating activity: $e');
-      _handleError(e);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to create activity: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -1679,22 +1752,40 @@ class _HomePageState extends State<HomePage> {
                 ),
               ],
             ),
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: _getStatusColor(activity.status),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                activity.status,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
+            Row(
+              children: [
+                Icon(
+                  Icons.access_time,
+                  size: 16,
+                  color: Colors.green.shade600,
                 ),
-              ),
+                SizedBox(width: 8),
+                Text(
+                  '${_formatTime(activity.startTime)} - ${_formatTime(activity.endTime)}',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
           ],
+        ),
+        SizedBox(height: 10),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: _getStatusColor(activity.status),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            activity.status,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ),
       ],
     );
@@ -1719,17 +1810,192 @@ class _HomePageState extends State<HomePage> {
       context: context,
       isScrollControlled: true,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25.0)),
       ),
-      builder: (context) => ActivityDetailsBottomSheet(
-        activity: activity,
-        onEdit: () {
-          _showEditActivityDialog(activity); // เรียกใช้ฟังก์ชันแก้ไข
-        },
-        onDelete: () {
-          _deleteActivity(activity.id); // เรียกใช้ฟังก์ชันลบ
-        },
-      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.green.shade50, Colors.white],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(25.0),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 10,
+                    offset: Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Drag Handle
+                  Center(
+                    child: Container(
+                      width: 50,
+                      height: 6,
+                      margin: EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                  ),
+
+                  // Header with Activity Title and Status
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            activity.title,
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green.shade900,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _getStatusColor(activity.status),
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            activity.status,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Divider
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 8.0,
+                    ),
+                    child: Divider(
+                      color: Colors.green.shade200,
+                      thickness: 1.5,
+                    ),
+                  ),
+
+                  // Details Section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildDetailRow(
+                          icon: Icons.calendar_today,
+                          label: 'Date',
+                          value: DateFormat('EEEE, dd MMM yyyy')
+                              .format(activity.date),
+                        ),
+                        SizedBox(height: 12),
+                        _buildDetailRow(
+                          icon: Icons.access_time,
+                          label: 'Time',
+                          value:
+                              '${_formatTime(activity.startTime)} - ${_formatTime(activity.endTime)}',
+                        ),
+                        SizedBox(height: 12),
+                        _buildDetailRow(
+                          icon: Icons.category,
+                          label: 'Type',
+                          value: activity.type,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Description Section
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Description',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green.shade900,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          activity.description.isEmpty
+                              ? 'No description provided'
+                              : activity.description,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: activity.description.isEmpty
+                                ? Colors.grey
+                                : Colors.black87,
+                            fontStyle: activity.description.isEmpty
+                                ? FontStyle.italic
+                                : FontStyle.normal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  IconData _getIconForActivityType(String type) {
+    switch (type) {
+      case 'Personal':
+        return Icons.person;
+      case 'Group':
+        return Icons.group;
+      default:
+        return Icons.event;
+    }
+  }
+
+  Widget _buildDetailRow(
+      {required IconData icon, required String label, required String value}) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: Colors.green.shade600),
+        SizedBox(width: 8),
+        Text(
+          '$label: $value',
+          style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
+        ),
+      ],
     );
   }
 
